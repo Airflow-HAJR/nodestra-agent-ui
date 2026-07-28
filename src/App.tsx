@@ -264,8 +264,8 @@ export function App() {
         )}
       </div>
 
-      {/* ── Sample question prompt ── */}
-      <div className="sample-question">
+      {/* ── Sample question prompt — hide once user has spoken ── */}
+      {!agent.messages.some(m => m.role === 'user') && <div className="sample-question">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{flexShrink:0, color:'var(--text-muted)'}}>
           {/* Person head */}
           <circle cx="9" cy="7" r="3" />
@@ -276,7 +276,7 @@ export function App() {
           <path d="M18 8.5a6 6 0 0 1 0 7" />
         </svg>
         {sampleQ}
-      </div>
+      </div>}
 
       {/* ── Google Maps (above pills) ── */}
       <div className="maps-section">
