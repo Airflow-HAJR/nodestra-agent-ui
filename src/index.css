@@ -342,6 +342,28 @@ body {
 .thinking-label { font-size: 14px; color: var(--text-muted); }
 
 
+/* ─── Sample question ───────────────────────────────────────── */
+.sample-question {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 18px 8px;
+  font-size: 14px;
+  color: var(--text-mid);
+  font-style: italic;
+}
+
+.sample-question-label {
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
 /* ─── Google Maps section ───────────────────────────────────── */
 .maps-section {
   flex-shrink: 0;

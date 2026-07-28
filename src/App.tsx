@@ -7,6 +7,29 @@ import type { Language } from './lib/types'
 
 const TWILIO_NUMBER = import.meta.env.VITE_TWILIO_NUMBER ?? ''
 
+const SAMPLE_QUESTIONS = [
+  '"Where is gate B12?"',
+  '"How do I get to baggage claim?"',
+  '"What\'s the status of flight AA 302?"',
+  '"Where\'s the nearest restroom?"',
+  '"Is there a Starbucks nearby?"',
+  '"How do I get to the Escape Lounge?"',
+  '"Where can I find an ATM?"',
+  '"Is TSA PreCheck open right now?"',
+  '"Where can I grab a quick bite?"',
+  '"Where do I go for international arrivals?"',
+  '"How long is the security line?"',
+  '"Where\'s the nearest charging station?"',
+  '"Can I bring my water bottle through security?"',
+  '"Which terminal is Southwest Airlines?"',
+  '"Is my gate in Terminal 1 or 2?"',
+  '"Where\'s the car rental pickup?"',
+]
+
+function randomQuestion() {
+  return SAMPLE_QUESTIONS[Math.floor(Math.random() * SAMPLE_QUESTIONS.length)]
+}
+
 
 function getStoredLanguage(): string {
   try { return localStorage.getItem(LANGUAGE_STORAGE_KEY) ?? DEFAULT_LANGUAGE } catch { return DEFAULT_LANGUAGE }
@@ -28,6 +51,7 @@ export function App() {
   const [historyOpen, setHistoryOpen] = useState(false)
   const [isSmsOpen, setIsSmsOpen]     = useState(false)
   const [mapExpanded, setMapExpanded] = useState(false)
+  const [sampleQ, setSampleQ]         = useState(randomQuestion)
   const [smsPhone, setSmsPhone]   = useState('')
   const [smsSent, setSmsSent]     = useState(false)
 
@@ -43,6 +67,18 @@ export function App() {
   useEffect(() => {
     prevStateRef.current = agent.agentState
   }, [agent.agentState])
+
+  // Refresh sample question each time the greeting plays (first agent message)
+  const prevMsgCountRef = useRef(0)
+  useEffect(() => {
+    const count = agent.messages.length
+    const prev  = prevMsgCountRef.current
+    prevMsgCountRef.current = count
+    // First agent message = greeting; re-roll the sample question
+    if (count === 1 && prev === 0 && agent.messages[0]?.role === 'agent') {
+      setSampleQ(randomQuestion())
+    }
+  }, [agent.messages])
 
 
   // Auto-scroll history
@@ -225,6 +261,12 @@ export function App() {
             )}
           </button>
         )}
+      </div>
+
+      {/* ── Sample question prompt ── */}
+      <div className="sample-question">
+        <span className="sample-question-label">Try asking</span>
+        {sampleQ}
       </div>
 
       {/* ── Google Maps (above pills) ── */}
