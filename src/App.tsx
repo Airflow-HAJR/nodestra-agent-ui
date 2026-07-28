@@ -7,6 +7,15 @@ import type { Language } from './lib/types'
 
 const TWILIO_NUMBER = import.meta.env.VITE_TWILIO_NUMBER ?? ''
 
+// Talking frames: neutral → slightly open → wide open → slightly open → ...
+const TALK_FRAMES = [
+  '/agent-avatar.png',   // mouth closed
+  '/agent-talk1.png',    // slightly open
+  '/agent-talk2.png',    // wide open
+  '/agent-talk1.png',    // slightly open
+]
+const TALK_FPS = 160 // ms per frame
+
 function getStoredLanguage(): string {
   try { return localStorage.getItem(LANGUAGE_STORAGE_KEY) ?? DEFAULT_LANGUAGE } catch { return DEFAULT_LANGUAGE }
 }
@@ -25,8 +34,9 @@ export function App() {
   const [userId]                  = useState(getOrCreateUserId)
   const [isLangOpen, setIsLangOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
-  const [isSmsOpen, setIsSmsOpen]   = useState(false)
+  const [isSmsOpen, setIsSmsOpen]     = useState(false)
   const [mapExpanded, setMapExpanded] = useState(false)
+  const [talkFrame, setTalkFrame]     = useState(0)
   const [smsPhone, setSmsPhone]   = useState('')
   const [smsSent, setSmsSent]     = useState(false)
 
@@ -41,6 +51,13 @@ export function App() {
   // Track state changes (no auto-listen — user taps mic manually)
   useEffect(() => {
     prevStateRef.current = agent.agentState
+  }, [agent.agentState])
+
+  // Cycle talking frames while agent is speaking
+  useEffect(() => {
+    if (agent.agentState !== 'speaking') { setTalkFrame(0); return }
+    const id = setInterval(() => setTalkFrame(f => (f + 1) % TALK_FRAMES.length), TALK_FPS)
+    return () => clearInterval(id)
   }, [agent.agentState])
 
   // Auto-scroll history
@@ -184,7 +201,7 @@ export function App() {
       <div className="center-stage">
         {isSpeaking ? (
           <div className="speaking-row">
-            <img src="/agent-avatar.png" alt="Agent" className="speaking-avatar" />
+            <img src={TALK_FRAMES[talkFrame]} alt="Agent" className="speaking-avatar" />
             <div className="speaking-text">
               {agent.streamingText}
               {agent.isStreaming && <span className="speaking-cursor" />}
