@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { LanguageSelector } from './components/LanguageSelector'
+import { MapDirectionsPanel } from './components/MapDirectionsPanel'
 import { useVoiceAgent } from './hooks/useVoiceAgent'
 import { useGeolocation } from './hooks/useGeolocation'
 import { LANGUAGES, DEFAULT_LANGUAGE, LANGUAGE_STORAGE_KEY, USER_ID_STORAGE_KEY, WS_URL, generateUserId } from './lib/constants'
@@ -280,7 +281,14 @@ export function App() {
 
       {/* ── Google Maps (above pills) ── */}
       <div className="maps-section">
-        {mapsUrl ? (
+        {agent.mapAction ? (
+          <MapDirectionsPanel
+            action={agent.mapAction}
+            userLat={geo.latitude ?? undefined}
+            userLng={geo.longitude ?? undefined}
+            onDismiss={agent.clearMapAction}
+          />
+        ) : mapsUrl ? (
           <div
             className={`maps-frame-wrap${mapExpanded ? ' maps-frame-wrap--expanded' : ''}`}
             onClick={(e) => {

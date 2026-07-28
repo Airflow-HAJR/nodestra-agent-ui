@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import type { AgentState, ConnectionState, Message, VoiceAgentConfig, ServerMessage } from '../lib/types'
+import type { AgentState, ConnectionState, MapActionPayload, Message, VoiceAgentConfig, ServerMessage } from '../lib/types'
 import { useAudioRecorder } from './useAudioRecorder'
 import { RECONNECT_BASE_DELAY_MS, RECONNECT_MAX_DELAY_MS, RECONNECT_MAX_ATTEMPTS } from '../lib/constants'
 
@@ -39,9 +39,11 @@ export interface VoiceAgentHook {
   micError: string | null
   streamingText: string      // text being revealed as audio plays
   isStreaming: boolean       // true while agent audio + text reveal is happening
+  mapAction: MapActionPayload | null
   startListening: () => Promise<void>
   stopListening: () => Promise<void>
   clearMessages: () => void
+  clearMapAction: () => void
   unlockAudio: () => void
 }
 
@@ -51,6 +53,7 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
   const [messages, setMessages] = useState<Message[]>([])
   const [streamingText, setStreamingText] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
+  const [mapAction, setMapAction] = useState<MapActionPayload | null>(null)
 
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectAttemptsRef = useRef(0)
@@ -249,6 +252,13 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
               }])
               setAgentState('idle')
               break
+            case 'map_action':
+              if (msg.action.type === 'clear') {
+                setMapAction(null)
+              } else {
+                setMapAction(msg.action)
+              }
+              break
           }
         } catch { /* ignore malformed */ }
       }
@@ -310,6 +320,7 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
   }, [agentState, recorder])
 
   const clearMessages = useCallback(() => setMessages([]), [])
+  const clearMapAction = useCallback(() => setMapAction(null), [])
 
   return {
     agentState, connectionState, messages,
@@ -318,6 +329,7 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
     micPermission: recorder.permissionState,
     micError: recorder.error,
     streamingText, isStreaming,
+    mapAction, clearMapAction,
     startListening, stopListening, clearMessages, unlockAudio,
   }
 }

@@ -31,12 +31,25 @@ export interface GeolocationState {
   loading: boolean
 }
 
+export interface MapDestination {
+  name: string
+  lat: number
+  lng: number
+}
+
+export type MapActionPayload =
+  | { type: 'show_destination'; destination: MapDestination }
+  | { type: 'show_directions'; destination: MapDestination; origin?: { lat: number; lng: number } }
+  | { type: 'show_route'; stops: MapDestination[] }
+  | { type: 'clear' }
+
 // WebSocket message types — inbound from server
 export type ServerMessage =
   | { type: 'transcript'; text: string; role: 'user' | 'agent' }
   | { type: 'audio'; data: string; format: 'mp3' | 'wav' | 'ogg' }
   | { type: 'status'; state: AgentState }
   | { type: 'error'; message: string }
+  | { type: 'map_action'; action: MapActionPayload }
 
 // WebSocket message types — outbound to server
 export type ClientMessage =
