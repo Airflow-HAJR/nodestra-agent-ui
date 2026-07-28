@@ -50,7 +50,7 @@ export function App() {
   const [isLangOpen, setIsLangOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [isSmsOpen, setIsSmsOpen]     = useState(false)
-  const [mapExpanded, setMapExpanded] = useState(false)
+  const [mapExpanded, setMapExpanded]   = useState(false)
   const mapCollapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [sampleQ, setSampleQ]         = useState(randomQuestion)
   const [smsPhone, setSmsPhone]   = useState('')
@@ -62,11 +62,18 @@ export function App() {
   const prevStateRef     = useRef('')
   const hasUnlockedRef   = useRef(false)
   const historyScrollRef = useRef<HTMLDivElement>(null)
-  const autoCloseTimer   = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [newestAgentMsgId, setNewestAgentMsgId]   = useState<string | null>(null)
+  const prevLastAgentIdRef = useRef<string | null>(null)
+  const [speakingExiting, setSpeakingExiting]     = useState(false)
 
-  // Track state changes (no auto-listen — user taps mic manually)
+  // Track state changes — trigger exit animation when speaking ends
   useEffect(() => {
+    const prev = prevStateRef.current
     prevStateRef.current = agent.agentState
+    if (prev === 'speaking' && agent.agentState !== 'speaking') {
+      setSpeakingExiting(true)
+      setTimeout(() => setSpeakingExiting(false), 350)
+    }
   }, [agent.agentState])
 
   // Refresh sample question each time the greeting plays (first agent message)
@@ -89,23 +96,19 @@ export function App() {
     }
   }, [historyOpen, agent.messages.length])
 
-  // 5-second auto-close for history
-  const scheduleHistoryClose = useCallback(() => {
-    if (autoCloseTimer.current) clearTimeout(autoCloseTimer.current)
-    autoCloseTimer.current = setTimeout(() => setHistoryOpen(false), 5000)
-  }, [])
-
+  // Track newest agent message for slide-in animation
   useEffect(() => {
-    if (historyOpen) {
-      scheduleHistoryClose()
-    } else {
-      if (autoCloseTimer.current) clearTimeout(autoCloseTimer.current)
+    const lastAgent = [...agent.messages].reverse().find(m => m.role === 'agent')
+    if (lastAgent && lastAgent.id !== prevLastAgentIdRef.current) {
+      prevLastAgentIdRef.current = lastAgent.id
+      setNewestAgentMsgId(lastAgent.id)
+      setTimeout(() => setNewestAgentMsgId(null), 700)
     }
-    return () => { if (autoCloseTimer.current) clearTimeout(autoCloseTimer.current) }
-  }, [historyOpen, scheduleHistoryClose])
+  }, [agent.messages])
 
   const ensureAudioUnlocked = () => {
     if (!hasUnlockedRef.current) { hasUnlockedRef.current = true; agent.unlockAudio() }
+    if (historyOpen) setHistoryOpen(false)
   }
 
   const handleMicClick = useCallback(async () => {
@@ -178,14 +181,11 @@ export function App() {
         {historyOpen && (
           <div
             className="history-overlay"
-            onTouchStart={scheduleHistoryClose}
-            onTouchMove={scheduleHistoryClose}
-            onScroll={scheduleHistoryClose}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="history-scroll" ref={historyScrollRef}>
               {msgs.map(msg => (
-                <div key={msg.id} className={`msg-row${msg.role === 'user' ? ' msg-row--user' : ''}`}>
+                <div key={msg.id} className={`msg-row${msg.role === 'user' ? ' msg-row--user' : ''}${msg.id === newestAgentMsgId ? ' msg-row--new' : ''}`}>
                   {msg.role === 'agent' && <img src="/agent-avatar.png" alt="" className="msg-avatar" />}
                   <div className={`msg-bubble msg-bubble--${msg.role}`}>{msg.text}</div>
                 </div>
@@ -210,7 +210,7 @@ export function App() {
               </div>
             )}
             {latest && (
-              <div className={`msg-row${latest.role === 'user' ? ' msg-row--user' : ''}`}>
+              <div className={`msg-row${latest.role === 'user' ? ' msg-row--user' : ''}${latest.id === newestAgentMsgId ? ' msg-row--new' : ''}`}>
                 {latest.role === 'agent' && <img src="/agent-avatar.png" alt="" className="msg-avatar" />}
                 <div className={`msg-bubble msg-bubble--${latest.role}`}>{latest.text}</div>
               </div>
@@ -221,8 +221,8 @@ export function App() {
 
       {/* ── Center stage ── */}
       <div className="center-stage">
-        {isSpeaking ? (
-          <div className="speaking-row">
+        {(isSpeaking || speakingExiting) ? (
+          <div className={`speaking-row${speakingExiting ? ' speaking-row--exit' : ''}`}>
             <img src="/agent-avatar.png" alt="Agent" className="speaking-avatar" />
             <div className="speaking-text">
               {agent.streamingText}

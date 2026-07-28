@@ -76,6 +76,18 @@ body {
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* Slide in from speaking area (below) into chat history */
+@keyframes msg-slide-from-speaking {
+  0%   { opacity: 0; transform: translateY(120px) scale(0.92); }
+  60%  { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes speaking-row-exit {
+  0%   { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-30px) scale(0.95); }
+}
+
 @keyframes blink-dot {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.2; }
@@ -223,6 +235,11 @@ body {
 .msg-row--faded .msg-bubble { opacity: 0.3; }
 .msg-row--faded .msg-avatar { opacity: 0.3; }
 
+/* Newest agent message slides up from speaking area */
+.msg-row--new {
+  animation: msg-slide-from-speaking 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 /* ─── Center stage ──────────────────────────────────────────── */
 .center-stage {
   flex: 1;
@@ -252,6 +269,11 @@ body {
   flex-shrink: 0;
   animation: avatar-bounce-in 0.45s cubic-bezier(0.34,1.56,0.64,1) both,
              avatar-float 2.8s ease-in-out 0.45s infinite;
+}
+
+.speaking-row--exit {
+  animation: speaking-row-exit 0.35s ease-in both;
+  pointer-events: none;
 }
 
 .speaking-text {
