@@ -265,8 +265,14 @@ export function App() {
 
       {/* ── Sample question prompt ── */}
       <div className="sample-question">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{flexShrink:0, color:'var(--text-muted)'}}>
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{flexShrink:0, color:'var(--text-muted)'}}>
+          {/* Person head */}
+          <circle cx="9" cy="7" r="3" />
+          {/* Person body */}
+          <path d="M3 21v-2a5 5 0 0 1 5-5h2" />
+          {/* Sound waves from mouth */}
+          <path d="M15 10.5a2.5 2.5 0 0 1 0 3" />
+          <path d="M18 8.5a6 6 0 0 1 0 7" />
         </svg>
         {sampleQ}
       </div>
