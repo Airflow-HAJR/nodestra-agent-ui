@@ -9,10 +9,8 @@ const TWILIO_NUMBER = import.meta.env.VITE_TWILIO_NUMBER ?? ''
 
 // Talking frames: neutral → slightly open → wide open → slightly open → ...
 const TALK_FRAMES = [
-  '/agent-avatar.png',   // mouth closed
-  '/agent-talk1.png',    // slightly open
-  '/agent-talk2.png',    // wide open
-  '/agent-talk1.png',    // slightly open
+  '/agent-avatar.png',  // mouth closed
+  '/agent-talk1.png',   // slightly open
 ]
 const TALK_FPS = 160 // ms per frame
 
