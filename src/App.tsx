@@ -51,6 +51,7 @@ export function App() {
   const [historyOpen, setHistoryOpen] = useState(false)
   const [isSmsOpen, setIsSmsOpen]     = useState(false)
   const [mapExpanded, setMapExpanded] = useState(false)
+  const mapCollapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [sampleQ, setSampleQ]         = useState(randomQuestion)
   const [smsPhone, setSmsPhone]   = useState('')
   const [smsSent, setSmsSent]     = useState(false)
@@ -282,7 +283,17 @@ export function App() {
         {mapsUrl ? (
           <div
             className={`maps-frame-wrap${mapExpanded ? ' maps-frame-wrap--expanded' : ''}`}
-            onClick={(e) => { e.stopPropagation(); setMapExpanded(v => !v) }}
+            onClick={(e) => {
+              e.stopPropagation()
+              if (mapCollapseTimer.current) clearTimeout(mapCollapseTimer.current)
+              setMapExpanded(v => {
+                if (!v) {
+                  // expanding — auto-collapse after 5s
+                  mapCollapseTimer.current = setTimeout(() => setMapExpanded(false), 5000)
+                }
+                return !v
+              })
+            }}
           >
             <iframe
               src={mapsUrl}
