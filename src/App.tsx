@@ -3,7 +3,7 @@ import { LanguageSelector } from './components/LanguageSelector'
 import { MapDirectionsPanel } from './components/MapDirectionsPanel'
 import { useVoiceAgent } from './hooks/useVoiceAgent'
 import { useGeolocation } from './hooks/useGeolocation'
-import { LANGUAGES, DEFAULT_LANGUAGE, LANGUAGE_STORAGE_KEY, USER_ID_STORAGE_KEY, WS_URL, generateUserId } from './lib/constants'
+import { LANGUAGES, DEFAULT_LANGUAGE, LANGUAGE_STORAGE_KEY, USER_ID_STORAGE_KEY, WS_URL, generateUserId, GOOGLE_MAPS_API_KEY } from './lib/constants'
 import type { Language } from './lib/types'
 
 const TWILIO_NUMBER = import.meta.env.VITE_TWILIO_NUMBER ?? ''
@@ -59,6 +59,9 @@ export function App() {
 
   const geo   = useGeolocation()
   const agent = useVoiceAgent({ serverUrl: WS_URL, language, userId })
+
+  // Auto-request location on mount — triggers the browser's native permission popup
+  useEffect(() => { geo.requestLocation() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const prevStateRef     = useRef('')
   const hasUnlockedRef   = useRef(false)
@@ -158,9 +161,11 @@ export function App() {
   const penult    = msgs.length >= 2 ? msgs[msgs.length - 2] : null
   const prePenult = msgs.length >= 3 ? msgs[msgs.length - 3] : null
 
-  // Google Maps embed URL
+  // Google Maps embed URL — view mode (no red pin), blue dot overlaid separately
   const mapsUrl = geo.latitude !== null
-    ? `https://www.google.com/maps?q=${geo.latitude},${geo.longitude}&z=17&output=embed`
+    ? GOOGLE_MAPS_API_KEY
+      ? `https://www.google.com/maps/embed/v1/view?key=${GOOGLE_MAPS_API_KEY}&center=${geo.latitude},${geo.longitude}&zoom=18`
+      : `https://maps.google.com/maps?ll=${geo.latitude},${geo.longitude}&z=18&output=embed`
     : null
 
   return (
@@ -296,7 +301,6 @@ export function App() {
               if (mapCollapseTimer.current) clearTimeout(mapCollapseTimer.current)
               setMapExpanded(v => {
                 if (!v) {
-                  // expanding — auto-collapse after 5s
                   mapCollapseTimer.current = setTimeout(() => setMapExpanded(false), 5000)
                 }
                 return !v
@@ -310,19 +314,13 @@ export function App() {
               referrerPolicy="no-referrer-when-downgrade"
               style={{ pointerEvents: 'none' }}
             />
-            <div className="maps-expand-hint">
-              {mapExpanded ? '▲ tap to collapse' : '▼ tap to expand'}
+            {/* Blue "my location" dot centered over the iframe */}
+            <div className="maps-blue-dot" aria-hidden="true">
+              <div className="maps-blue-dot__ring" />
+              <div className="maps-blue-dot__core" />
             </div>
           </div>
-        ) : (
-          <button className="maps-enable-btn" onClick={(e) => { e.stopPropagation(); geo.requestLocation() }}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="10" r="3" />
-              <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 14 8 14s8-8.75 8-14a8 8 0 0 0-8-8z" />
-            </svg>
-            Enable location to see map
-          </button>
-        )}
+        ) : null}
       </div>
 
       {/* ── Bottom controls ── */}
