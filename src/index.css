@@ -287,13 +287,16 @@ body {
   --orb-glow: rgba(239, 68, 68, 0.55);
 }
 
-/* Soft halo behind the sphere. */
+/* Soft halo behind the sphere. Box is sized well beyond the visible glow
+   radius so the blur fully dissipates to nothing before it hits the box's
+   own edge — too little margin here is what leaves a faint hard-edged
+   rectangle visible against the page background. */
 .orb-container::before {
   content: "";
   position: absolute;
-  inset: 4%;
+  inset: -45%;
   border-radius: 50%;
-  background: radial-gradient(circle, var(--orb-glow), transparent 70%);
+  background: radial-gradient(circle, var(--orb-glow), transparent 42%);
   filter: blur(18px);
   transition: background 0.6s ease;
   pointer-events: none;
@@ -320,11 +323,43 @@ body {
     0 0 26px 2px var(--orb-glow),
     inset 0 0 18px rgba(255, 255, 255, 0.25);
   transform: scale(var(--listen-scale, 1));
-  transition: background 0.6s ease, box-shadow 0.6s ease, transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  animation: orb-breathe var(--orb-breathe, 4.5s) ease-in-out infinite;
+  transition: box-shadow 0.6s ease, transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  animation:
+    orb-breathe var(--orb-breathe, 4.5s) ease-in-out infinite,
+    orb-morph 9s ease-in-out infinite;
 }
 
-.orb-core--intense { cursor: pointer; }
+.orb-core--intense {
+  cursor: pointer;
+  animation:
+    orb-breathe var(--orb-breathe, 4.5s) ease-in-out infinite,
+    orb-morph 2.6s ease-in-out infinite;
+}
+
+/* Drifting color blobs — an "oil in water" look — blended into the base
+   sphere fill. Each drifts on its own path/timing so they never sync up. */
+.orb-core__blob {
+  position: absolute;
+  inset: -25%;
+  border-radius: 50%;
+  mix-blend-mode: soft-light;
+  will-change: transform;
+}
+.orb-core__blob--a {
+  background: radial-gradient(circle at 50% 50%, var(--orb-c2), transparent 58%);
+  animation: blob-drift-a 7s ease-in-out infinite;
+}
+.orb-core__blob--b {
+  background: radial-gradient(circle at 50% 50%, var(--orb-c1), transparent 55%);
+  animation: blob-drift-b 9.5s ease-in-out infinite;
+  animation-delay: -3s;
+}
+.orb-core__blob--c {
+  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.6), transparent 50%);
+  animation: blob-drift-a 6s ease-in-out infinite reverse;
+  animation-delay: -1.5s;
+  opacity: 0.7;
+}
 
 .orb-core__sheen {
   position: absolute;
@@ -342,6 +377,19 @@ body {
   animation: orb-spin var(--orb-spin, 9s) linear infinite;
 }
 
+/* Fine grain — a small tiled noise raster used as an ordinary background
+   image (not a live SVG filter), so it decodes and renders like any other
+   image with none of the WebKit live-filter clipping bugs. */
+.orb-core__grain {
+  position: absolute;
+  inset: -25%;
+  background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjAiIGhlaWdodD0iMTIwIj48ZmlsdGVyIGlkPSJuIj48ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iMC44NSIgbnVtT2N0YXZlcz0iMiIgc3RpdGNoVGlsZXM9InN0aXRjaCIvPjxmZUNvbG9yTWF0cml4IHR5cGU9Im1hdHJpeCIgdmFsdWVzPSIwIDAgMCAwIDEgIDAgMCAwIDAgMSAgMCAwIDAgMCAxICAwIDAgMCAwLjU1IDAiLz48L2ZpbHRlcj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWx0ZXI9InVybCglMjNuKSIvPjwvc3ZnPg==");
+  background-size: 140px 140px;
+  mix-blend-mode: overlay;
+  opacity: 0.35;
+  animation: grain-flicker 0.6s steps(4) infinite;
+}
+
 @keyframes orb-breathe {
   0%, 100% { filter: brightness(1) saturate(1); }
   50%      { filter: brightness(1.1) saturate(1.15); }
@@ -350,6 +398,39 @@ body {
 @keyframes orb-spin {
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
+}
+
+/* Organic squash: the sphere's own border-radius corners flow in and out
+   asymmetrically, giving it a soft, liquid, "breathing" silhouette instead
+   of a perfectly rigid circle. Always-on, but much stronger/faster while
+   speaking (applied via .orb-core--intense above). */
+@keyframes orb-morph {
+  0%, 100% { border-radius: 50%; }
+  25%      { border-radius: 46% 54% 62% 38% / 41% 44% 56% 59%; }
+  50%      { border-radius: 58% 42% 38% 62% / 55% 60% 40% 45%; }
+  75%      { border-radius: 40% 60% 55% 45% / 62% 38% 47% 53%; }
+}
+
+@keyframes blob-drift-a {
+  0%   { transform: translate(-10%, -6%) scale(1); }
+  33%  { transform: translate(9%, 11%) scale(1.18); }
+  66%  { transform: translate(-6%, 9%) scale(0.88); }
+  100% { transform: translate(-10%, -6%) scale(1); }
+}
+
+@keyframes blob-drift-b {
+  0%   { transform: translate(8%, -9%) scale(1.05); }
+  40%  { transform: translate(-11%, 4%) scale(0.85); }
+  70%  { transform: translate(4%, 10%) scale(1.2); }
+  100% { transform: translate(8%, -9%) scale(1.05); }
+}
+
+@keyframes grain-flicker {
+  0%   { background-position: 0 0; }
+  25%  { background-position: -18px 6px; }
+  50%  { background-position: 10px -12px; }
+  75%  { background-position: -8px -6px; }
+  100% { background-position: 0 0; }
 }
 
 .orb-status {

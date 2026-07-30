@@ -24,7 +24,11 @@ export function AgentOrb({ state, audioLevel = 0, muted = false, onInterrupt }: 
         className={`orb-core${isSpeaking ? ' orb-core--intense' : ''}`}
         style={{ '--listen-scale': listenScale } as CSSProperties}
       >
+        <div className="orb-core__blob orb-core__blob--a" />
+        <div className="orb-core__blob orb-core__blob--b" />
+        <div className="orb-core__blob orb-core__blob--c" />
         <div className="orb-core__sheen" />
+        <div className="orb-core__grain" />
       </div>
     </div>
   )
