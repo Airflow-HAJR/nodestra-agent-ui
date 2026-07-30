@@ -3,8 +3,9 @@ import { getSupportedMimeType } from '../lib/constants'
 
 const SILENCE_THRESHOLD = 0.04   // RMS level below this = silence
 const SPEECH_THRESHOLD  = 0.08   // RMS level above this = speech detected
-const SILENCE_DELAY_MS  = 1200   // ms of silence before auto-stop
+const SILENCE_DELAY_MS  = 2000   // ms of silence before auto-stop — generous enough to survive natural mid-sentence pauses
 const MIN_SPEECH_MS     = 400    // must detect speech for this long before VAD can trigger
+const PRE_ROLL_RECYCLE_MS = 1500 // recycle the idle pre-roll recorder this often so it never accumulates more than this much lead-in
 
 interface AudioRecorderOptions {
   onSilence?: () => void              // called when VAD detects end of speech
@@ -58,6 +59,17 @@ export function useAudioRecorder(): AudioRecorder {
   const speechThresholdRef = useRef(SPEECH_THRESHOLD)
   const speechSustainMsRef = useRef(0)
 
+  // Pre-roll: while waiting for VAD to confirm speech, every chunk the
+  // (currently active) recorder produces is buffered here in full — nothing
+  // is ever evicted mid-stream, which is what corrupted the WebM container
+  // in an earlier attempt at this. Instead, the recorder itself gets
+  // recycled periodically (see preRollIntervalRef) so it's never more than
+  // PRE_ROLL_RECYCLE_MS old, keeping the buffer small and always contiguous
+  // from its own chunk 0. Once speech is confirmed, whatever the *current*
+  // recorder has buffered so far gets flushed as-is — no gaps possible.
+  const chunkBufferRef = useRef<Blob[]>([])
+  const preRollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
   const stopLevelMonitor = useCallback(() => {
     if (animFrameRef.current !== null) {
       cancelAnimationFrame(animFrameRef.current)
@@ -71,19 +83,33 @@ export function useAudioRecorder(): AudioRecorder {
     setState(prev => ({ ...prev, audioLevel: 0 }))
   }, [])
 
-  // Starts a brand-new MediaRecorder on the already-open stream, right at the
-  // moment real speech begins. Starting it fresh here (rather than reusing a
-  // MediaRecorder that's been running since the mic proactively opened,
-  // possibly many seconds earlier) keeps its internal timestamps/container
-  // header aligned with the audio actually being forwarded — a stale header
-  // paired with chunks from much later confuses the server-side decoder.
+  // Starts a MediaRecorder on the already-open stream. Its very first chunk
+  // carries the container header; every chunk we ever forward for this
+  // utterance comes from this same instance, so the stream stays valid for
+  // the server-side decoder.
+  //
+  // Before speech is confirmed, chunks are buffered (not sent) — see
+  // ondataavailable below — so the moment VAD fires we can flush the lead-in
+  // audio too, instead of losing whatever was said while RMS was still
+  // ramping up to SPEECH_THRESHOLD. (An earlier version of this pinned only
+  // the very first chunk forever and evicted everything else past a size
+  // cap, which left a multi-second gap in the encoded stream whenever the
+  // mic sat idle for a while before speech started — that corrupted
+  // transcription entirely. This version never evicts; see
+  // schedulePreRollRecycle for how the buffer stays bounded instead.)
   const beginUtteranceRecording = useCallback((stream: MediaStream) => {
     const mimeType = getSupportedMimeType()
     const recorder = new MediaRecorder(stream, { mimeType })
     mediaRecorderRef.current = recorder
+    chunkBufferRef.current = []
 
     recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) onChunkRef.current?.(e.data)
+      if (e.data.size === 0) return
+      if (speechDetectedRef.current) {
+        onChunkRef.current?.(e.data) // speech confirmed — forward live
+      } else {
+        chunkBufferRef.current.push(e.data) // still waiting — buffer, don't send
+      }
     }
     recorder.onstop = () => {
       resolveStopRef.current?.()
@@ -91,6 +117,31 @@ export function useAudioRecorder(): AudioRecorder {
     }
 
     recorder.start(100)
+  }, [])
+
+  // While waiting for speech, swap in a fresh recorder every
+  // PRE_ROLL_RECYCLE_MS so its buffered lead-in never grows past that —
+  // bounding memory/latency without ever having to evict a chunk out from
+  // the middle of an in-progress recording.
+  const schedulePreRollRecycle = useCallback((stream: MediaStream) => {
+    if (preRollIntervalRef.current) clearInterval(preRollIntervalRef.current)
+    preRollIntervalRef.current = setInterval(() => {
+      if (speechDetectedRef.current) return // speech already confirmed elsewhere — nothing to do
+      const old = mediaRecorderRef.current
+      if (old && old.state !== 'inactive') {
+        old.ondataavailable = null
+        old.onstop = null
+        try { old.stop() } catch { /* already stopped */ }
+      }
+      beginUtteranceRecording(stream)
+    }, PRE_ROLL_RECYCLE_MS)
+  }, [beginUtteranceRecording])
+
+  const stopPreRollRecycle = useCallback(() => {
+    if (preRollIntervalRef.current) {
+      clearInterval(preRollIntervalRef.current)
+      preRollIntervalRef.current = null
+    }
   }, [])
 
   const startLevelMonitor = useCallback((stream: MediaStream) => {
@@ -146,8 +197,16 @@ export function useAudioRecorder(): AudioRecorder {
           speechDetectedRef.current = true
           speechStartTimeRef.current = speechCandidateStartRef.current
           speechCandidateStartRef.current = null
-          beginUtteranceRecording(stream)
+          stopPreRollRecycle()
+          // Fire onSpeechStart FIRST — it sends the 'audio_start' message that
+          // opens the server's transcription socket. Only then flush the
+          // buffered lead-in audio (already-running recorder, never evicted,
+          // so this is always a gapless continuation of its own chunk 0),
+          // so those chunks never race ahead of the message that makes the
+          // server ready to receive them.
           onSpeechStartRef.current?.()
+          for (const chunk of chunkBufferRef.current) onChunkRef.current?.(chunk)
+          chunkBufferRef.current = []
         }
 
         if (isSilent) {
@@ -175,7 +234,7 @@ export function useAudioRecorder(): AudioRecorder {
     } catch {
       // Audio level monitoring optional
     }
-  }, [beginUtteranceRecording])
+  }, [stopPreRollRecycle])
 
   const start = useCallback(async (opts?: AudioRecorderOptions) => {
     if (state.isRecording) return
@@ -208,13 +267,19 @@ export function useAudioRecorder(): AudioRecorder {
     }
 
     streamRef.current = stream
-    mediaRecorderRef.current = null // no MediaRecorder yet — created lazily once real speech starts
+    // Start pre-roll recording immediately (not lazily at speech onset) so
+    // quiet lead-in audio can be buffered and flushed once VAD confirms
+    // speech; schedulePreRollRecycle keeps swapping in a fresh recorder so
+    // that buffer never grows past PRE_ROLL_RECYCLE_MS.
+    beginUtteranceRecording(stream)
+    schedulePreRollRecycle(stream)
 
     startLevelMonitor(stream)
     setState(prev => ({ ...prev, isRecording: true }))
-  }, [state.isRecording, startLevelMonitor])
+  }, [state.isRecording, startLevelMonitor, beginUtteranceRecording, schedulePreRollRecycle])
 
   const stop = useCallback((): Promise<void> => {
+    stopPreRollRecycle() // otherwise a pending recycle could fire after teardown and record on a dead stream
     return new Promise((resolve) => {
       const recorder = mediaRecorderRef.current
       const finish = () => {
@@ -234,7 +299,7 @@ export function useAudioRecorder(): AudioRecorder {
         resolve()
       }
     })
-  }, [stopLevelMonitor])
+  }, [stopLevelMonitor, stopPreRollRecycle])
 
   return {
     start,

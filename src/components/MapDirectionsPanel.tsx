@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { MapActionPayload } from '../lib/types'
 import { GOOGLE_MAPS_API_KEY } from '../lib/constants'
+import { loadGoogleMaps } from '../lib/googleMapsLoader'
 
 interface Props {
   action: MapActionPayload
@@ -9,47 +10,115 @@ interface Props {
   onDismiss: () => void
 }
 
-function buildEmbedUrl(action: MapActionPayload, userLat?: number, userLng?: number): string | null {
-  if (action.type === 'clear') return null
+const ROUTE_COLOR = '#4285F4' // Google-blue — the route line must always render in this color
+const ORIGIN_COLOR = '#4285F4'
+const DESTINATION_COLOR = '#EA4335'
+const WAYPOINT_COLOR = '#34A853'
 
-  if (action.type === 'show_destination') {
-    const { lat, lng } = action.destination
-    if (GOOGLE_MAPS_API_KEY) {
-      return `https://www.google.com/maps/embed/v1/place?key=${GOOGLE_MAPS_API_KEY}&q=${lat},${lng}&zoom=18`
-    }
-    return `https://maps.google.com/maps?q=${lat},${lng}&z=18&output=embed`
-  }
+// Renders markers + a manually-drawn polyline on a real Google Maps JS
+// instance. We do NOT use the Embed API's `directions` mode here — Google's
+// road/walking router frequently can't find a path between indoor airport
+// coordinates that sit only a few dozen meters apart, and silently falls
+// back to showing bare pins with no connecting line. Drawing the line
+// ourselves (straight between our own known waypoints) guarantees the route
+// is always visible, in blue, regardless of what Google's router thinks.
+function MapCanvas({ action, userLat, userLng }: { action: MapActionPayload; userLat?: number; userLng?: number }) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const mapRef = useRef<any>(null)
+  const overlaysRef = useRef<any[]>([])
 
-  if (action.type === 'show_directions') {
-    const { lat: dLat, lng: dLng } = action.destination
-    const originLat = action.origin?.lat ?? userLat
-    const originLng = action.origin?.lng ?? userLng
+  useEffect(() => {
+    if (!GOOGLE_MAPS_API_KEY || action.type === 'clear') return
+    let cancelled = false
 
-    if (originLat != null && originLng != null) {
-      if (GOOGLE_MAPS_API_KEY) {
-        return `https://www.google.com/maps/embed/v1/directions?key=${GOOGLE_MAPS_API_KEY}&origin=${originLat},${originLng}&destination=${dLat},${dLng}&mode=walking`
+    loadGoogleMaps(GOOGLE_MAPS_API_KEY).then((google) => {
+      if (cancelled || !containerRef.current) return
+
+      if (!mapRef.current) {
+        mapRef.current = new google.maps.Map(containerRef.current, {
+          zoom: 18,
+          center: { lat: 0, lng: 0 },
+          disableDefaultUI: true,
+          zoomControl: true,
+          gestureHandling: 'greedy',
+        })
       }
-      return `https://maps.google.com/maps?saddr=${originLat},${originLng}&daddr=${dLat},${dLng}&output=embed`
-    }
-    // No origin — just show destination pin
-    if (GOOGLE_MAPS_API_KEY) {
-      return `https://www.google.com/maps/embed/v1/place?key=${GOOGLE_MAPS_API_KEY}&q=${dLat},${dLng}&zoom=18`
-    }
-    return `https://maps.google.com/maps?q=${dLat},${dLng}&z=18&output=embed`
+      const map = mapRef.current
+
+      overlaysRef.current.forEach(o => o.setMap(null))
+      overlaysRef.current = []
+
+      const bounds = new google.maps.LatLngBounds()
+
+      const addMarker = (pos: { lat: number; lng: number }, label: string, color: string) => {
+        const marker = new google.maps.Marker({
+          position: pos,
+          map,
+          label: label ? { text: label, color: '#fff', fontSize: '11px', fontWeight: '700' } : undefined,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 10,
+            fillColor: color,
+            fillOpacity: 1,
+            strokeColor: '#fff',
+            strokeWeight: 2,
+          },
+          zIndex: color === DESTINATION_COLOR ? 10 : 5,
+        })
+        overlaysRef.current.push(marker)
+        bounds.extend(pos)
+      }
+
+      const drawRoute = (path: { lat: number; lng: number }[]) => {
+        const line = new google.maps.Polyline({
+          path,
+          map,
+          strokeColor: ROUTE_COLOR,
+          strokeOpacity: 0.9,
+          strokeWeight: 5,
+        })
+        overlaysRef.current.push(line)
+      }
+
+      if (action.type === 'show_destination') {
+        addMarker(action.destination, '', DESTINATION_COLOR)
+        map.setCenter(action.destination)
+        map.setZoom(18)
+        return
+      }
+
+      if (action.type === 'show_directions') {
+        const origin = action.origin ?? (userLat != null && userLng != null ? { lat: userLat, lng: userLng } : null)
+        addMarker(action.destination, '', DESTINATION_COLOR)
+        if (origin) {
+          addMarker(origin, '', ORIGIN_COLOR)
+          drawRoute([origin, action.destination])
+          map.fitBounds(bounds, 48)
+        } else {
+          map.setCenter(action.destination)
+          map.setZoom(18)
+        }
+        return
+      }
+
+      if (action.type === 'show_route' && action.stops.length >= 2) {
+        action.stops.forEach((stop, i) => {
+          const color = i === 0 ? ORIGIN_COLOR : i === action.stops.length - 1 ? DESTINATION_COLOR : WAYPOINT_COLOR
+          addMarker(stop, String(i + 1), color)
+        })
+        drawRoute(action.stops)
+        map.fitBounds(bounds, 48)
+      }
+    }).catch(() => { /* Maps SDK failed to load — panel just stays blank */ })
+
+    return () => { cancelled = true }
+  }, [action, userLat, userLng])
+
+  if (!GOOGLE_MAPS_API_KEY) {
+    return <div className="map-sheet-empty">Google Maps API key not configured.</div>
   }
 
-  if (action.type === 'show_route' && action.stops.length >= 2) {
-    const first = action.stops[0]
-    const last = action.stops[action.stops.length - 1]
-    if (GOOGLE_MAPS_API_KEY) {
-      const waypoints = action.stops.slice(1, -1).map(s => `${s.lat},${s.lng}`).join('|')
-      const waypointParam = waypoints ? `&waypoints=${waypoints}` : ''
-      return `https://www.google.com/maps/embed/v1/directions?key=${GOOGLE_MAPS_API_KEY}&origin=${first.lat},${first.lng}&destination=${last.lat},${last.lng}${waypointParam}&mode=walking`
-    }
-    return `https://maps.google.com/maps?saddr=${first.lat},${first.lng}&daddr=${last.lat},${last.lng}&output=embed`
-  }
-
-  return null
+  return <div ref={containerRef} className="map-canvas" />
 }
 
 function MapHeader({
@@ -105,14 +174,12 @@ function MapHeader({
 
 export function MapDirectionsPanel({ action, userLat, userLng, onDismiss }: Props) {
   const [expanded, setExpanded] = useState(false)
-  const embedUrl = useMemo(
-    () => buildEmbedUrl(action, userLat, userLng),
-    [action, userLat, userLng]
-  )
 
-  if (!embedUrl) return null
+  if (action.type === 'clear') return null
 
-  const destinationName = 'destination' in action ? action.destination.name : ''
+  const destinationName = action.type === 'show_route'
+    ? action.stops[action.stops.length - 1]?.name ?? ''
+    : action.destination.name
   const isDirections = action.type === 'show_directions' || action.type === 'show_route'
 
   return (
@@ -127,13 +194,7 @@ export function MapDirectionsPanel({ action, userLat, userLng, onDismiss }: Prop
           onDismiss={onDismiss}
         />
         <div className="map-directions-embed">
-          <iframe
-            src={embedUrl}
-            title={isDirections ? `Directions to ${destinationName}` : destinationName}
-            loading="lazy"
-            referrerPolicy="no-referrer-when-downgrade"
-            allowFullScreen
-          />
+          <MapCanvas action={action} userLat={userLat} userLng={userLng} />
         </div>
       </div>
 
@@ -149,13 +210,7 @@ export function MapDirectionsPanel({ action, userLat, userLng, onDismiss }: Prop
               onDismiss={() => { setExpanded(false); onDismiss() }}
             />
             <div className="map-expand-embed">
-              <iframe
-                src={embedUrl}
-                title={isDirections ? `Directions to ${destinationName}` : destinationName}
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-                allowFullScreen
-              />
+              <MapCanvas action={action} userLat={userLat} userLng={userLng} />
             </div>
           </div>
         </div>

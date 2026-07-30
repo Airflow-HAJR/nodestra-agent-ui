@@ -4,10 +4,14 @@ import { LanguageSelector } from './components/LanguageSelector'
 import { MapDirectionsPanel } from './components/MapDirectionsPanel'
 import { useVoiceAgent } from './hooks/useVoiceAgent'
 import { useGeolocation } from './hooks/useGeolocation'
-import { LANGUAGES, DEFAULT_LANGUAGE, LANGUAGE_STORAGE_KEY, USER_ID_STORAGE_KEY, WS_URL, generateUserId, GOOGLE_MAPS_API_KEY } from './lib/constants'
+import { useTypewriter } from './hooks/useTypewriter'
+import { LANGUAGES, DEFAULT_LANGUAGE, LANGUAGE_STORAGE_KEY, USER_ID_STORAGE_KEY, WS_URL, generateUserId, GOOGLE_MAPS_API_KEY, AGENT_AVATAR_URL } from './lib/constants'
 import type { Language } from './lib/types'
 
 const TWILIO_NUMBER = import.meta.env.VITE_TWILIO_NUMBER ?? ''
+
+const MAP_AUTO_CLOSE_MS = 5000
+const MAP_COLLAPSE_ANIM_MS = 500
 
 function getStoredLanguage(): string {
   try { return localStorage.getItem(LANGUAGE_STORAGE_KEY) ?? DEFAULT_LANGUAGE } catch { return DEFAULT_LANGUAGE }
@@ -29,6 +33,7 @@ export function App() {
   const [overflowOpen, setOverflowOpen] = useState(false)
   const [isSmsOpen, setIsSmsOpen]     = useState(false)
   const [mapSheetOpen, setMapSheetOpen] = useState(false)
+  const [mapSheetClosing, setMapSheetClosing] = useState(false)
   const [textOpen, setTextOpen]       = useState(false)
   const [textValue, setTextValue]     = useState('')
   const [smsPhone, setSmsPhone]   = useState('')
@@ -46,10 +51,39 @@ export function App() {
   const [newestAgentMsgId, setNewestAgentMsgId]   = useState<string | null>(null)
   const prevLastAgentIdRef = useRef<string | null>(null)
 
-  // Auto-open the map sheet whenever the agent issues a map action
+  // A bare destination pin isn't worth interrupting the user for — only
+  // trajectories (routes/directions) pop the map open automatically.
+  const mapAutoCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const mapCollapseTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const clearMapTimers = useCallback(() => {
+    if (mapAutoCloseTimerRef.current) { clearTimeout(mapAutoCloseTimerRef.current); mapAutoCloseTimerRef.current = null }
+    if (mapCollapseTimerRef.current) { clearTimeout(mapCollapseTimerRef.current); mapCollapseTimerRef.current = null }
+  }, [])
+
+  // Animates the sheet shrinking down into the nav button, then hides it —
+  // the map action itself is left untouched, so the nav button keeps
+  // whatever trajectory was last shown.
+  const collapseMapSheet = useCallback(() => {
+    clearMapTimers()
+    setMapSheetClosing(true)
+    mapCollapseTimerRef.current = setTimeout(() => {
+      setMapSheetOpen(false)
+      setMapSheetClosing(false)
+      mapCollapseTimerRef.current = null
+    }, MAP_COLLAPSE_ANIM_MS)
+  }, [clearMapTimers])
+
   useEffect(() => {
-    if (agent.mapAction) setMapSheetOpen(true)
-  }, [agent.mapAction])
+    const action = agent.mapAction
+    if (!action || (action.type !== 'show_directions' && action.type !== 'show_route')) return
+    clearMapTimers()
+    setMapSheetClosing(false)
+    setMapSheetOpen(true)
+    mapAutoCloseTimerRef.current = setTimeout(collapseMapSheet, MAP_AUTO_CLOSE_MS)
+  }, [agent.mapAction, clearMapTimers, collapseMapSheet])
+
+  useEffect(() => clearMapTimers, [clearMapTimers])
 
   // Auto-scroll history
   useEffect(() => {
@@ -117,10 +151,21 @@ export function App() {
     agent.toggleMute()
   }, [agent]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Dismissing the sheet (X / backdrop) only hides it — same as the
+  // auto-collapse — so the nav button keeps holding the last trajectory.
+  // The docked route is only actually cleared when the agent itself sends
+  // a "clear" map action (e.g. arriving at the destination).
   const closeMapSheet = useCallback(() => {
+    clearMapTimers()
+    setMapSheetClosing(false)
     setMapSheetOpen(false)
-    if (agent.mapAction) agent.clearMapAction()
-  }, [agent])
+  }, [clearMapTimers])
+
+  const openMapSheet = useCallback(() => {
+    clearMapTimers()
+    setMapSheetClosing(false)
+    setMapSheetOpen(true)
+  }, [clearMapTimers])
 
   const isListening = agent.agentState === 'listening'
   const isSpeaking  = agent.agentState === 'speaking'
@@ -142,6 +187,27 @@ export function App() {
   const msgs      = agent.messages
   const latest    = msgs[msgs.length - 1]
   const penult    = msgs.length >= 2 ? msgs[msgs.length - 2] : null
+
+  const typedPartialTranscript = useTypewriter(agent.partialTranscript, 22)
+
+  // Keep the user's last-heard words on screen for a couple seconds after
+  // silence is detected, instead of snapping straight to "Thinking…".
+  const [heldTranscript, setHeldTranscript] = useState('')
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    if (isListening) {
+      if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null }
+      if (typedPartialTranscript) setHeldTranscript(typedPartialTranscript)
+      return
+    }
+    if (heldTranscript && !holdTimerRef.current) {
+      holdTimerRef.current = setTimeout(() => {
+        setHeldTranscript('')
+        holdTimerRef.current = null
+      }, 2000)
+    }
+  }, [isListening, typedPartialTranscript, heldTranscript])
+  useEffect(() => () => { if (holdTimerRef.current) clearTimeout(holdTimerRef.current) }, [])
 
   // Google Maps embed URL — passive "my location" view (only rendered inside the map sheet)
   const mapsUrl = geo.latitude !== null
@@ -182,7 +248,7 @@ export function App() {
               <div className="history-scroll" ref={historyScrollRef}>
                 {msgs.map(msg => (
                   <div key={msg.id} className={`msg-row${msg.role === 'user' ? ' msg-row--user' : ''}${msg.id === newestAgentMsgId ? ' msg-row--new' : ''}`}>
-                    {msg.role === 'agent' && <img src="/agent-avatar.png" alt="" className="msg-avatar" />}
+                    {msg.role === 'agent' && <img src={AGENT_AVATAR_URL} alt="" className="msg-avatar" />}
                     <div className={`msg-bubble msg-bubble--${msg.role}`}>{msg.text}</div>
                   </div>
                 ))}
@@ -192,13 +258,13 @@ export function App() {
             <div className="chat-inner">
               {penult && (
                 <div className={`msg-row msg-row--faded${penult.role === 'user' ? ' msg-row--user' : ''}`}>
-                  {penult.role === 'agent' && <img src="/agent-avatar.png" alt="" className="msg-avatar" />}
+                  {penult.role === 'agent' && <img src={AGENT_AVATAR_URL} alt="" className="msg-avatar" />}
                   <div className={`msg-bubble msg-bubble--${penult.role}`}>{penult.text}</div>
                 </div>
               )}
               {latest && (
                 <div className={`msg-row${latest.role === 'user' ? ' msg-row--user' : ''}${latest.id === newestAgentMsgId ? ' msg-row--new' : ''}`}>
-                  {latest.role === 'agent' && <img src="/agent-avatar.png" alt="" className="msg-avatar" />}
+                  {latest.role === 'agent' && <img src={AGENT_AVATAR_URL} alt="" className="msg-avatar" />}
                   <div className={`msg-bubble msg-bubble--${latest.role}`}>{latest.text}</div>
                 </div>
               )}
@@ -221,10 +287,10 @@ export function App() {
               {agent.streamingText}
               {agent.isStreaming && <span className="speaking-cursor" />}
             </div>
-          ) : isListening && agent.partialTranscript ? (
+          ) : heldTranscript ? (
             <div className="partial-caption">
-              {agent.partialTranscript}
-              <span className="speaking-cursor" />
+              {heldTranscript}
+              {isListening && <span className="speaking-cursor" />}
             </div>
           ) : statusCaption ? (
             <div className="status-caption">{statusCaption}</div>
@@ -296,15 +362,30 @@ export function App() {
               )}
             </button>
 
-            <span className="bottom-spacer" aria-hidden="true" />
+            <button
+              className="bottom-icon-btn bottom-icon-btn--nav"
+              onClick={(e) => { e.stopPropagation(); openMapSheet() }}
+              aria-label="Show map"
+            >
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="10" r="3" />
+                <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 14 8 14s8-8.75 8-14a8 8 0 0 0-8-8z" />
+              </svg>
+              {agent.mapAction && (agent.mapAction.type === 'show_directions' || agent.mapAction.type === 'show_route') && (
+                <span className="nav-map-pulse" aria-hidden="true">
+                  <span className="nav-map-pulse__ring" />
+                  <span className="nav-map-pulse__ring" />
+                </span>
+              )}
+            </button>
           </>
         )}
       </div>
 
       {/* ── Map bottom sheet ── */}
       {mapSheetOpen && (
-        <div className="map-sheet-overlay" onClick={(e) => { e.stopPropagation(); closeMapSheet() }}>
-          <div className="map-sheet" onClick={(e) => e.stopPropagation()}>
+        <div className={`map-sheet-overlay${mapSheetClosing ? ' map-sheet-overlay--collapsing' : ''}`} onClick={(e) => { e.stopPropagation(); closeMapSheet() }}>
+          <div className={`map-sheet${mapSheetClosing ? ' map-sheet--collapsing' : ''}`} onClick={(e) => e.stopPropagation()}>
             <div className="sheet-handle" />
             {agent.mapAction ? (
               <MapDirectionsPanel

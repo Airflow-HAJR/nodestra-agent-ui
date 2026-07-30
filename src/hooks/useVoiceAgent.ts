@@ -81,6 +81,9 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
 
   // Pending agent text (arrives before audio)
   const pendingAgentTextRef = useRef<string | null>(null)
+  // Mirrors streamingText so interrupt() can read the just-revealed portion
+  // without depending on (and being recreated alongside) fast-changing state.
+  const streamingTextRef = useRef('')
 
   useEffect(() => { configRef.current = config }, [config])
   useEffect(() => { agentStateRef.current = agentState }, [agentState])
@@ -110,6 +113,7 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
 
   const streamText = useCallback((text: string, durationMs: number, onDone: () => void) => {
     clearStream()
+    streamingTextRef.current = ''
     setStreamingText('')
     setIsStreaming(true)
 
@@ -122,7 +126,9 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
 
     streamIntervalRef.current = setInterval(() => {
       i++
-      setStreamingText(chars.slice(0, i).join(''))
+      const revealed = chars.slice(0, i).join('')
+      streamingTextRef.current = revealed
+      setStreamingText(revealed)
       if (i >= total) {
         clearStream()
         onDone()
@@ -162,6 +168,7 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
           language: configRef.current.language,
         }
         setMessages(prev => [...prev, msg])
+        streamingTextRef.current = ''
         setStreamingText('')
         setIsStreaming(false)
       })
@@ -203,6 +210,19 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
     audioQueueRef.current = []
     pendingAgentTextRef.current = null
     clearStream()
+    // Whatever text had already been revealed stays in the conversation —
+    // just marked as cut off — rather than vanishing when the user barges in.
+    const revealed = streamingTextRef.current.trim()
+    if (revealed) {
+      setMessages(prev => [...prev, {
+        id: `${Date.now()}-${Math.random()}`,
+        role: 'agent',
+        text: `${revealed}—`,
+        timestamp: new Date(),
+        language: configRef.current.language,
+      }])
+    }
+    streamingTextRef.current = ''
     setStreamingText('')
     setIsStreaming(false)
     if (currentSourceRef.current) {
@@ -269,8 +289,15 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
               }
               break
             case 'partial_transcript':
-              // Live growing transcript of the user's own speech, before they've stopped talking.
-              setPartialTranscript(msg.text)
+              // Live growing transcript of the user's own speech, before they've
+              // stopped talking. Deepgram's interim hypothesis for the still-open
+              // segment can legitimately get revised (including shrinking) as more
+              // audio arrives — most noticeably right around brief pauses, where
+              // its endpointing logic reconsiders the segment boundary. The
+              // caption should only ever grow during one utterance, so ignore any
+              // update that isn't at least as long as what's already shown;
+              // handleSpeechStart resets this to '' at the start of each new one.
+              setPartialTranscript(prev => (msg.text.length >= prev.length ? msg.text : prev))
               break
             case 'audio':
               enqueueAudio(msg.data)
@@ -335,9 +362,11 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
   }, [config.language, config.userId])
 
   // ─── Live-streamed chunk forwarding ───────────────────────────────────
-  // The recorder only ever starts producing chunks once real speech has been
-  // detected (see useAudioRecorder), so every chunk it hands us here belongs
-  // to the current utterance — just relay them to the server in strict order.
+  // The recorder only ever hands us chunks once real speech has been detected
+  // (buffered lead-in audio included — see useAudioRecorder), so every chunk
+  // here belongs to the current utterance — relay them in strict order.
+  // stopListening awaits this chain before sending audio_end, so the final
+  // chunk's async base64/send can never race behind that message.
   const handleChunk = useCallback((blob: Blob) => {
     chunkChainRef.current = chunkChainRef.current.then(async () => {
       if (wsRef.current?.readyState !== WebSocket.OPEN) return
@@ -354,6 +383,7 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
     isForwardingRef.current = true
     if (agentStateRef.current === 'speaking') interrupt()
     setAgentState('listening')
+    setPartialTranscript('') // fresh baseline for this utterance's monotonic-growth guard
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'audio_start', language: configRef.current.language }))
     }
@@ -366,6 +396,13 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
     stopListeningRef.current = null
     setAgentState('thinking')
     try { await recorder.stop() } catch { /* already stopped */ }
+    // recorder.stop() resolves once the MediaRecorder's 'stop' event fires,
+    // but the final chunk's base64-encode-then-send is queued asynchronously
+    // on chunkChainRef (see handleChunk) and may not have gone out yet.
+    // Wait for it, or audio_end can reach the server first and finalize the
+    // transcript before those last words ever arrive — dropping them even
+    // though they were captured.
+    await chunkChainRef.current
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'audio_end' }))
     } else {
