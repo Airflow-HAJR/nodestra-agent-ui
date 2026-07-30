@@ -231,6 +231,12 @@ body {
   padding: 12px 0;
 }
 
+/* Custom CSS-only orb. Deliberately avoids SVG `filter: url(#id)` (WebKit
+   clips/fails to paint those on iOS) and `mask-composite` (WebKit needs
+   different keyword values than the standard) — everything here is plain
+   gradients, blend modes, and the simple `filter: blur()/grayscale()`
+   functions, which all render reliably cross-browser. */
+
 .orb-container {
   position: relative;
   width: min(58vw, 213px);
@@ -240,23 +246,110 @@ body {
   justify-content: center;
   flex-shrink: 0;
   transition: filter 0.4s ease, opacity 0.4s ease;
+
+  --orb-c1: #7c6cf5;
+  --orb-c2: #a78bfa;
+  --orb-c3: #4c3fc9;
+  --orb-glow: rgba(124, 108, 245, 0.5);
+  --orb-spin: 9s;
+  --orb-breathe: 4.5s;
 }
 
-/* Plain-CSS glow behind the "circle" theme's flat fill — pure CSS,
-   nothing WebGL-dependent, so it always paints alongside the orb. */
+.orb-container[data-state='listening'] {
+  --orb-c1: #6ea8fe;
+  --orb-c2: #bfe0ff;
+  --orb-c3: #3b6fd9;
+  --orb-glow: rgba(110, 168, 254, 0.55);
+  --orb-breathe: 2.4s;
+}
+
+.orb-container[data-state='thinking'] {
+  --orb-c1: #8b5cf6;
+  --orb-c2: #c4b5fd;
+  --orb-c3: #5b21b6;
+  --orb-glow: rgba(139, 92, 246, 0.55);
+  --orb-spin: 3.2s;
+}
+
+.orb-container[data-state='speaking'] {
+  --orb-c1: #f97066;
+  --orb-c2: #ffc2a8;
+  --orb-c3: #c2410c;
+  --orb-glow: rgba(249, 112, 102, 0.6);
+  --orb-breathe: 1.5s;
+  --orb-spin: 4s;
+}
+
+.orb-container[data-state='error'] {
+  --orb-c1: #ef4444;
+  --orb-c2: #fca5a5;
+  --orb-c3: #991b1b;
+  --orb-glow: rgba(239, 68, 68, 0.55);
+}
+
+/* Soft halo behind the sphere. */
 .orb-container::before {
   content: "";
   position: absolute;
-  inset: 8%;
+  inset: 4%;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(145, 71, 255, 0.35), transparent 70%);
+  background: radial-gradient(circle, var(--orb-glow), transparent 70%);
   filter: blur(18px);
+  transition: background 0.6s ease;
   pointer-events: none;
 }
 
 .orb-container--muted {
   filter: grayscale(1);
   opacity: 0.6;
+}
+
+.orb-core {
+  position: relative;
+  width: 72%;
+  height: 72%;
+  border-radius: 50%;
+  overflow: hidden;
+  isolation: isolate;
+  cursor: default;
+  background:
+    radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 32%),
+    radial-gradient(circle at 68% 72%, var(--orb-c2), transparent 55%),
+    radial-gradient(circle at 50% 50%, var(--orb-c1), var(--orb-c3) 88%);
+  box-shadow:
+    0 0 26px 2px var(--orb-glow),
+    inset 0 0 18px rgba(255, 255, 255, 0.25);
+  transform: scale(var(--listen-scale, 1));
+  transition: background 0.6s ease, box-shadow 0.6s ease, transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  animation: orb-breathe var(--orb-breathe, 4.5s) ease-in-out infinite;
+}
+
+.orb-core--intense { cursor: pointer; }
+
+.orb-core__sheen {
+  position: absolute;
+  inset: -25%;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    rgba(255, 255, 255, 0.4) 60deg,
+    transparent 130deg,
+    rgba(255, 255, 255, 0.22) 230deg,
+    transparent 300deg
+  );
+  mix-blend-mode: soft-light;
+  animation: orb-spin var(--orb-spin, 9s) linear infinite;
+}
+
+@keyframes orb-breathe {
+  0%, 100% { filter: brightness(1) saturate(1); }
+  50%      { filter: brightness(1.1) saturate(1.15); }
+}
+
+@keyframes orb-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
 
 .orb-status {
