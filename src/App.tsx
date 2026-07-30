@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { AgentOrb } from './components/AgentOrb'
 import { LanguageSelector } from './components/LanguageSelector'
 import { MapDirectionsPanel } from './components/MapDirectionsPanel'
 import { useVoiceAgent } from './hooks/useVoiceAgent'
@@ -7,30 +8,6 @@ import { LANGUAGES, DEFAULT_LANGUAGE, LANGUAGE_STORAGE_KEY, USER_ID_STORAGE_KEY,
 import type { Language } from './lib/types'
 
 const TWILIO_NUMBER = import.meta.env.VITE_TWILIO_NUMBER ?? ''
-
-const SAMPLE_QUESTIONS = [
-  '"Where is gate B12?"',
-  '"How do I get to baggage claim?"',
-  '"What\'s the status of flight AA 302?"',
-  '"Where\'s the nearest restroom?"',
-  '"Is there a Starbucks nearby?"',
-  '"How do I get to the Escape Lounge?"',
-  '"Where can I find an ATM?"',
-  '"Is TSA PreCheck open right now?"',
-  '"Where can I grab a quick bite?"',
-  '"Where do I go for international arrivals?"',
-  '"How long is the security line?"',
-  '"Where\'s the nearest charging station?"',
-  '"Can I bring my water bottle through security?"',
-  '"Which terminal is Southwest Airlines?"',
-  '"Is my gate in Terminal 1 or 2?"',
-  '"Where\'s the car rental pickup?"',
-]
-
-function randomQuestion() {
-  return SAMPLE_QUESTIONS[Math.floor(Math.random() * SAMPLE_QUESTIONS.length)]
-}
-
 
 function getStoredLanguage(): string {
   try { return localStorage.getItem(LANGUAGE_STORAGE_KEY) ?? DEFAULT_LANGUAGE } catch { return DEFAULT_LANGUAGE }
@@ -48,12 +25,12 @@ function getOrCreateUserId(): string {
 export function App() {
   const [language, setLanguage]   = useState(getStoredLanguage)
   const [userId]                  = useState(getOrCreateUserId)
-  const [isLangOpen, setIsLangOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [overflowOpen, setOverflowOpen] = useState(false)
   const [isSmsOpen, setIsSmsOpen]     = useState(false)
-  const [mapExpanded, setMapExpanded]   = useState(false)
-  const mapCollapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [sampleQ, setSampleQ]         = useState(randomQuestion)
+  const [mapSheetOpen, setMapSheetOpen] = useState(false)
+  const [textOpen, setTextOpen]       = useState(false)
+  const [textValue, setTextValue]     = useState('')
   const [smsPhone, setSmsPhone]   = useState('')
   const [smsSent, setSmsSent]     = useState(false)
 
@@ -63,35 +40,16 @@ export function App() {
   // Auto-request location on mount — triggers the browser's native permission popup
   useEffect(() => { geo.requestLocation() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const prevStateRef     = useRef('')
   const hasUnlockedRef   = useRef(false)
   const historyScrollRef = useRef<HTMLDivElement>(null)
+  const wasMutedBeforeTypingRef = useRef(false)
   const [newestAgentMsgId, setNewestAgentMsgId]   = useState<string | null>(null)
   const prevLastAgentIdRef = useRef<string | null>(null)
-  const [speakingExiting, setSpeakingExiting]     = useState(false)
 
-  // Track state changes — trigger exit animation when speaking ends
+  // Auto-open the map sheet whenever the agent issues a map action
   useEffect(() => {
-    const prev = prevStateRef.current
-    prevStateRef.current = agent.agentState
-    if (prev === 'speaking' && agent.agentState !== 'speaking') {
-      setSpeakingExiting(true)
-      setTimeout(() => setSpeakingExiting(false), 350)
-    }
-  }, [agent.agentState])
-
-  // Refresh sample question each time the greeting plays (first agent message)
-  const prevMsgCountRef = useRef(0)
-  useEffect(() => {
-    const count = agent.messages.length
-    const prev  = prevMsgCountRef.current
-    prevMsgCountRef.current = count
-    // First agent message = greeting; re-roll the sample question
-    if (count === 1 && prev === 0 && agent.messages[0]?.role === 'agent') {
-      setSampleQ(randomQuestion())
-    }
-  }, [agent.messages])
-
+    if (agent.mapAction) setMapSheetOpen(true)
+  }, [agent.mapAction])
 
   // Auto-scroll history
   useEffect(() => {
@@ -115,19 +73,9 @@ export function App() {
     if (historyOpen) setHistoryOpen(false)
   }
 
-  const handleMicClick = useCallback(async () => {
-    ensureAudioUnlocked()
-    if (agent.agentState === 'listening') {
-      await agent.stopListening()
-    } else if (agent.agentState === 'idle' || agent.agentState === 'error') {
-      await agent.startListening()
-    }
-  }, [agent]) // eslint-disable-line react-hooks/exhaustive-deps
-
   const handleLanguageSelect = useCallback((lang: Language) => {
     setLanguage(lang.code)
     try { localStorage.setItem(LANGUAGE_STORAGE_KEY, lang.code) } catch { /* ignore */ }
-    setIsLangOpen(false)
   }, [])
 
   const handleSmsSubmit = useCallback(async () => {
@@ -144,11 +92,39 @@ export function App() {
     setSmsSent(true)
   }, [smsPhone])
 
-  const currentLang = LANGUAGES.find(l => l.code === language)
+  const openTextInput = useCallback(() => {
+    ensureAudioUnlocked()
+    wasMutedBeforeTypingRef.current = agent.muted
+    if (!agent.muted) agent.toggleMute()
+    setTextOpen(true)
+  }, [agent]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const closeTextInput = useCallback(() => {
+    setTextOpen(false)
+    setTextValue('')
+    if (!wasMutedBeforeTypingRef.current && agent.muted) agent.toggleMute()
+  }, [agent])
+
+  const handleTextSubmit = useCallback(() => {
+    const trimmed = textValue.trim()
+    if (!trimmed) return
+    agent.sendText(trimmed)
+    closeTextInput()
+  }, [textValue, agent, closeTextInput])
+
+  const handleMuteToggle = useCallback(() => {
+    ensureAudioUnlocked()
+    agent.toggleMute()
+  }, [agent]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const closeMapSheet = useCallback(() => {
+    setMapSheetOpen(false)
+    if (agent.mapAction) agent.clearMapAction()
+  }, [agent])
+
   const isListening = agent.agentState === 'listening'
   const isSpeaking  = agent.agentState === 'speaking'
   const isThinking  = agent.agentState === 'thinking'
-  const isDisabled  = !agent.isConnected || isThinking || agent.micPermission === 'denied'
 
   const dotClass = `header-dot header-dot--${
     agent.connectionState === 'connected' ? 'connected'
@@ -156,12 +132,18 @@ export function App() {
     : 'disconnected'
   }`
 
+  const statusCaption = agent.muted ? 'Muted'
+    : isListening ? 'Listening…'
+    : isThinking ? (agent.thinkingLabel ?? 'Thinking…')
+    : agent.connectionState === 'reconnecting' ? 'Reconnecting…'
+    : agent.connectionState === 'disconnected' ? 'Disconnected'
+    : ''
+
   const msgs      = agent.messages
   const latest    = msgs[msgs.length - 1]
   const penult    = msgs.length >= 2 ? msgs[msgs.length - 2] : null
-  const prePenult = msgs.length >= 3 ? msgs[msgs.length - 3] : null
 
-  // Google Maps embed URL — view mode (no red pin), blue dot overlaid separately
+  // Google Maps embed URL — passive "my location" view (only rendered inside the map sheet)
   const mapsUrl = geo.latitude !== null
     ? GOOGLE_MAPS_API_KEY
       ? `https://www.google.com/maps/embed/v1/view?key=${GOOGLE_MAPS_API_KEY}&center=${geo.latitude},${geo.longitude}&zoom=18`
@@ -174,189 +156,190 @@ export function App() {
       {/* ── Header ── */}
       <header className="app-header">
         <span className="header-title">Oakland International Airport</span>
-        <span className={dotClass} />
+        <div className="header-right">
+          <span className={dotClass} />
+          <button
+            className="header-overflow-btn"
+            onClick={(e) => { e.stopPropagation(); setOverflowOpen(true) }}
+            aria-label="Settings"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="1" /><circle cx="12" cy="5" r="1" /><circle cx="12" cy="19" r="1" />
+            </svg>
+          </button>
+        </div>
       </header>
 
-      {/* ── Chat area ── */}
-      <div
-        className="chat-area"
-        style={{ cursor: msgs.length > 2 ? 'pointer' : 'default' }}
-        onClick={(e) => { e.stopPropagation(); if (msgs.length > 2) setHistoryOpen(true) }}
-      >
-        {/* Full history overlay */}
-        {historyOpen && (
-          <div
-            className="history-overlay"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="history-scroll" ref={historyScrollRef}>
-              {msgs.map(msg => (
-                <div key={msg.id} className={`msg-row${msg.role === 'user' ? ' msg-row--user' : ''}${msg.id === newestAgentMsgId ? ' msg-row--new' : ''}`}>
-                  {msg.role === 'agent' && <img src="/agent-avatar.png" alt="" className="msg-avatar" />}
-                  <div className={`msg-bubble msg-bubble--${msg.role}`}>{msg.text}</div>
-                </div>
-              ))}
+      {/* ── Conversation history (kept, minimized) ── */}
+      {msgs.length > 0 && (
+        <div
+          className="chat-area"
+          style={{ cursor: msgs.length > 1 ? 'pointer' : 'default' }}
+          onClick={(e) => { e.stopPropagation(); if (msgs.length > 1) setHistoryOpen(true) }}
+        >
+          {historyOpen ? (
+            <div className="history-overlay" onClick={(e) => e.stopPropagation()}>
+              <div className="history-scroll" ref={historyScrollRef}>
+                {msgs.map(msg => (
+                  <div key={msg.id} className={`msg-row${msg.role === 'user' ? ' msg-row--user' : ''}${msg.id === newestAgentMsgId ? ' msg-row--new' : ''}`}>
+                    {msg.role === 'agent' && <img src="/agent-avatar.png" alt="" className="msg-avatar" />}
+                    <div className={`msg-bubble msg-bubble--${msg.role}`}>{msg.text}</div>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="chat-inner">
+              {penult && (
+                <div className={`msg-row msg-row--faded${penult.role === 'user' ? ' msg-row--user' : ''}`}>
+                  {penult.role === 'agent' && <img src="/agent-avatar.png" alt="" className="msg-avatar" />}
+                  <div className={`msg-bubble msg-bubble--${penult.role}`}>{penult.text}</div>
+                </div>
+              )}
+              {latest && (
+                <div className={`msg-row${latest.role === 'user' ? ' msg-row--user' : ''}${latest.id === newestAgentMsgId ? ' msg-row--new' : ''}`}>
+                  {latest.role === 'agent' && <img src="/agent-avatar.png" alt="" className="msg-avatar" />}
+                  <div className={`msg-bubble msg-bubble--${latest.role}`}>{latest.text}</div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
-        {/* Masked recent view */}
-        {!historyOpen && (
-          <div className="chat-inner">
-            {prePenult && (
-              <div className={`msg-row msg-row--faded${prePenult.role === 'user' ? ' msg-row--user' : ''}`}>
-                {prePenult.role === 'agent' && <img src="/agent-avatar.png" alt="" className="msg-avatar" />}
-                <div className={`msg-bubble msg-bubble--${prePenult.role}`}>{prePenult.text}</div>
-              </div>
-            )}
-            {penult && (
-              <div className={`msg-row msg-row--faded${penult.role === 'user' ? ' msg-row--user' : ''}`}>
-                {penult.role === 'agent' && <img src="/agent-avatar.png" alt="" className="msg-avatar" />}
-                <div className={`msg-bubble msg-bubble--${penult.role}`}>{penult.text}</div>
-              </div>
-            )}
-            {latest && (
-              <div className={`msg-row${latest.role === 'user' ? ' msg-row--user' : ''}${latest.id === newestAgentMsgId ? ' msg-row--new' : ''}`}>
-                {latest.role === 'agent' && <img src="/agent-avatar.png" alt="" className="msg-avatar" />}
-                <div className={`msg-bubble msg-bubble--${latest.role}`}>{latest.text}</div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* ── Center stage ── */}
+      {/* ── Center stage: the orb ── */}
       <div className="center-stage">
-        {(isSpeaking || speakingExiting) ? (
-          <div className={`speaking-row${speakingExiting ? ' speaking-row--exit' : ''}`}>
-            <img src="/agent-avatar.png" alt="Agent" className="speaking-avatar" />
-            <div className="speaking-text">
+        <AgentOrb
+          state={agent.agentState}
+          audioLevel={agent.audioLevel}
+          muted={agent.muted}
+          onInterrupt={agent.interrupt}
+        />
+        <div className="orb-status">
+          {isSpeaking ? (
+            <div className="speaking-caption">
               {agent.streamingText}
               {agent.isStreaming && <span className="speaking-cursor" />}
             </div>
-          </div>
-        ) : isThinking ? (
-          <div className="thinking-wrap">
-            <div className="thinking-spinner" />
-            <span className="thinking-label">Thinking…</span>
-          </div>
-        ) : (
-          <button
-            className={`mic-btn${isListening ? ' mic-btn--listening' : ''}`}
-            onClick={(e) => { e.stopPropagation(); handleMicClick() }}
-            disabled={isDisabled && !isListening}
-            aria-label={isListening ? 'Send' : 'Tap to speak'}
+          ) : isListening && agent.partialTranscript ? (
+            <div className="partial-caption">
+              {agent.partialTranscript}
+              <span className="speaking-cursor" />
+            </div>
+          ) : statusCaption ? (
+            <div className="status-caption">{statusCaption}</div>
+          ) : null}
+        </div>
+      </div>
+
+      {/* ── Bottom bar: keyboard toggle + mute ── */}
+      <div className="bottom-bar">
+        {textOpen ? (
+          <form
+            className="text-input-row"
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={(e) => { e.preventDefault(); handleTextSubmit() }}
           >
-            {isListening && (
-              <>
-                <span className="mic-ring" />
-                <span className="mic-ring" />
-                <span className="mic-ring" />
-              </>
-            )}
-            {isListening ? (
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <rect x="6" y="6" width="12" height="12" rx="2" />
+            <input
+              className="text-input"
+              autoFocus
+              value={textValue}
+              onChange={(e) => setTextValue(e.target.value)}
+              placeholder="Type a message…"
+              onKeyDown={(e) => { if (e.key === 'Escape') closeTextInput() }}
+            />
+            <button type="button" className="text-input-close" onClick={closeTextInput} aria-label="Close text input">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
               </svg>
-            ) : (
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                <line x1="12" y1="19" x2="12" y2="23" />
-                <line x1="8" y1="23" x2="16" y2="23" />
+            </button>
+            <button type="submit" className="text-input-send" disabled={!textValue.trim()} aria-label="Send">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M2 21l21-9L2 3v7l15 2-15 2z" />
               </svg>
-            )}
-          </button>
+            </button>
+          </form>
+        ) : (
+          <>
+            <button
+              className="bottom-icon-btn"
+              onClick={(e) => { e.stopPropagation(); openTextInput() }}
+              aria-label="Type instead of speaking"
+            >
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="5" width="20" height="14" rx="2" />
+                <line x1="6" y1="9" x2="6" y2="9" /><line x1="10" y1="9" x2="10" y2="9" /><line x1="14" y1="9" x2="14" y2="9" /><line x1="18" y1="9" x2="18" y2="9" />
+                <line x1="6" y1="13" x2="18" y2="13" />
+              </svg>
+            </button>
+
+            <button
+              className={`mute-btn${agent.muted ? ' mute-btn--muted' : ''}`}
+              onClick={(e) => { e.stopPropagation(); handleMuteToggle() }}
+              aria-label={agent.muted ? 'Unmute microphone' : 'Mute microphone'}
+            >
+              {agent.muted ? (
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="1" y1="1" x2="23" y2="23" />
+                  <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
+                  <path d="M17 16.95A7 7 0 0 1 5 12v-2M19 10v2a7 7 0 0 1-.11 1.23" />
+                  <line x1="12" y1="19" x2="12" y2="23" />
+                  <line x1="8" y1="23" x2="16" y2="23" />
+                </svg>
+              ) : (
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                  <line x1="12" y1="19" x2="12" y2="23" />
+                  <line x1="8" y1="23" x2="16" y2="23" />
+                </svg>
+              )}
+            </button>
+
+            <span className="bottom-spacer" aria-hidden="true" />
+          </>
         )}
       </div>
 
-      {/* ── Sample question prompt — hide once user has spoken ── */}
-      {!agent.messages.some(m => m.role === 'user') && <div className="sample-question">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{flexShrink:0, color:'var(--text-muted)'}}>
-          {/* Person head */}
-          <circle cx="9" cy="7" r="3" />
-          {/* Person body */}
-          <path d="M3 21v-2a5 5 0 0 1 5-5h2" />
-          {/* Sound waves from mouth */}
-          <path d="M15 10.5a2.5 2.5 0 0 1 0 3" />
-          <path d="M18 8.5a6 6 0 0 1 0 7" />
-        </svg>
-        {sampleQ}
-      </div>}
-
-      {/* ── Google Maps (above pills) ── */}
-      <div className="maps-section">
-        {agent.mapAction ? (
-          <MapDirectionsPanel
-            action={agent.mapAction}
-            userLat={geo.latitude ?? undefined}
-            userLng={geo.longitude ?? undefined}
-            onDismiss={agent.clearMapAction}
-          />
-        ) : mapsUrl ? (
-          <div
-            className={`maps-frame-wrap${mapExpanded ? ' maps-frame-wrap--expanded' : ''}`}
-            onClick={(e) => {
-              e.stopPropagation()
-              if (mapCollapseTimer.current) clearTimeout(mapCollapseTimer.current)
-              setMapExpanded(v => {
-                if (!v) {
-                  mapCollapseTimer.current = setTimeout(() => setMapExpanded(false), 5000)
-                }
-                return !v
-              })
-            }}
-          >
-            <iframe
-              src={mapsUrl}
-              title="Your location"
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-              style={{ pointerEvents: 'none' }}
-            />
-            {/* Blue "my location" dot centered over the iframe */}
-            <div className="maps-blue-dot" aria-hidden="true">
-              <div className="maps-blue-dot__ring" />
-              <div className="maps-blue-dot__core" />
-            </div>
-          </div>
-        ) : null}
-      </div>
-
-      {/* ── Bottom controls ── */}
-      <div className="bottom-controls">
-        <div className="toggle-row">
-          <button className="toggle-pill" onClick={(e) => { e.stopPropagation(); setIsLangOpen(true) }}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-            </svg>
-            {currentLang?.nativeName ?? language}
-          </button>
-
-          <button className="toggle-pill toggle-pill--sms" onClick={(e) => { e.stopPropagation(); setIsSmsOpen(true); setSmsSent(false) }}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-            </svg>
-            Text me instead
-          </button>
-        </div>
-
-        <div className="bottom-hint">
-          {isListening ? 'Listening — tap to send early'
-            : isSpeaking || isThinking ? ''
-            : agent.isConnected ? 'Tap the mic to speak'
-            : agent.connectionState === 'reconnecting' ? 'Reconnecting…'
-            : 'Disconnected'}
-        </div>
-      </div>
-
-      {/* ── Language sheet ── */}
-      {isLangOpen && (
-        <div className="sheet-overlay" onClick={() => setIsLangOpen(false)}>
-          <div className="sheet" onClick={e => e.stopPropagation()}>
+      {/* ── Map bottom sheet ── */}
+      {mapSheetOpen && (
+        <div className="map-sheet-overlay" onClick={(e) => { e.stopPropagation(); closeMapSheet() }}>
+          <div className="map-sheet" onClick={(e) => e.stopPropagation()}>
             <div className="sheet-handle" />
-            <div className="sheet-title">Choose language</div>
+            {agent.mapAction ? (
+              <MapDirectionsPanel
+                action={agent.mapAction}
+                userLat={geo.latitude ?? undefined}
+                userLng={geo.longitude ?? undefined}
+                onDismiss={closeMapSheet}
+              />
+            ) : mapsUrl ? (
+              <div className="maps-frame-wrap">
+                <iframe
+                  src={mapsUrl}
+                  title="Your location"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  style={{ pointerEvents: 'none' }}
+                />
+                <div className="maps-blue-dot" aria-hidden="true">
+                  <div className="maps-blue-dot__ring" />
+                  <div className="maps-blue-dot__core" />
+                </div>
+              </div>
+            ) : (
+              <div className="map-sheet-empty">Location unavailable</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Overflow / settings sheet ── */}
+      {overflowOpen && (
+        <div className="sheet-overlay" onClick={() => setOverflowOpen(false)}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="sheet-handle" />
+            <div className="sheet-title">Language</div>
             <div className="lang-grid">
               {LANGUAGES.map(lang => (
                 <button
@@ -367,6 +350,27 @@ export function App() {
                   {lang.nativeName}
                 </button>
               ))}
+            </div>
+            <div className="settings-actions">
+              <button
+                className="settings-action-btn"
+                onClick={() => { setOverflowOpen(false); setIsSmsOpen(true); setSmsSent(false) }}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+                Text me instead
+              </button>
+              <button
+                className="settings-action-btn"
+                onClick={() => { setOverflowOpen(false); setMapSheetOpen(true) }}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="10" r="3" />
+                  <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 14 8 14s8-8.75 8-14a8 8 0 0 0-8-8z" />
+                </svg>
+                Show map
+              </button>
             </div>
           </div>
         </div>

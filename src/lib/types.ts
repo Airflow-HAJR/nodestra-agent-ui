@@ -46,13 +46,18 @@ export type MapActionPayload =
 // WebSocket message types — inbound from server
 export type ServerMessage =
   | { type: 'transcript'; text: string; role: 'user' | 'agent' }
+  | { type: 'partial_transcript'; text: string; final: boolean }
   | { type: 'audio'; data: string; format: 'mp3' | 'wav' | 'ogg' }
-  | { type: 'status'; state: AgentState }
+  | { type: 'status'; state: AgentState; label?: string }
   | { type: 'error'; message: string }
   | { type: 'map_action'; action: MapActionPayload }
 
 // WebSocket message types — outbound to server
 export type ClientMessage =
   | { type: 'audio'; data: string; language: string; format: 'webm' | 'ogg' | 'mp4' }
+  | { type: 'audio_start'; language: string }
+  | { type: 'audio_chunk'; data: string }
+  | { type: 'audio_end' }
+  | { type: 'text'; text: string; language: string }
   | { type: 'config'; language: string; userId?: string }
   | { type: 'ping' }

@@ -1,73 +1,47 @@
+import type { CSSProperties } from 'react'
 import type { AgentState } from '../lib/types'
 
 interface AgentOrbProps {
   state: AgentState
   audioLevel?: number
+  muted?: boolean
+  onInterrupt?: () => void
 }
 
-export function AgentOrb({ state, audioLevel = 0 }: AgentOrbProps) {
-  const scale = state === 'listening' ? 1 + audioLevel * 0.15 : 1
+export function AgentOrb({ state, audioLevel = 0, muted = false, onInterrupt }: AgentOrbProps) {
+  const isSpeaking = state === 'speaking' && !muted
+  const listenScale = state === 'listening' ? 1 + Math.min(audioLevel, 1) * 0.12 : 1
 
   return (
-    <div className="orb-container" aria-label={`Agent is ${state}`} role="img">
-      {/* Outer ambient glow */}
-      <div className={`orb-ambient orb-ambient--${state}`} />
-
-      {/* Ring layers */}
-      <div className={`orb-ring orb-ring-outer orb-ring--${state}`} />
-      <div className={`orb-ring orb-ring-mid orb-ring--${state}`} />
-      <div className={`orb-ring orb-ring-inner orb-ring--${state}`} />
-
-      {/* Core sphere */}
+    <div className="orb-container">
       <div
-        className={`orb-core orb-core--${state}`}
-        style={{ transform: `scale(${scale})` }}
+        className={`orb orb--${muted ? 'muted' : state}${isSpeaking ? ' orb--intense' : ''}`}
+        style={{ '--listen-scale': listenScale } as CSSProperties}
+        role="img"
+        aria-label={muted ? 'Agent is muted' : `Agent is ${state}`}
+        onClick={isSpeaking ? onInterrupt : undefined}
       >
-        {/* Shimmer highlight */}
-        <div className="orb-shimmer" />
-        {/* Inner glow */}
-        <div className={`orb-inner-glow orb-inner-glow--${state}`} />
-
-        {/* State icon */}
-        <div className="orb-icon">
-          {state === 'idle' && (
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-              <line x1="12" y1="19" x2="12" y2="23" />
-              <line x1="8" y1="23" x2="16" y2="23" />
-            </svg>
-          )}
-          {state === 'listening' && (
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="orb-icon-pulse">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" fill="rgba(166,107,122,0.3)" />
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-              <line x1="12" y1="19" x2="12" y2="23" />
-              <line x1="8" y1="23" x2="16" y2="23" />
-            </svg>
-          )}
-          {state === 'thinking' && (
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="orb-icon-spin">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
-            </svg>
-          )}
-          {state === 'speaking' && (
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="rgba(166,107,122,0.3)" />
-              <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-              <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-            </svg>
-          )}
-          {state === 'error' && (
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-          )}
+        <div className="icons">
+          <svg className="svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+            <g fill="none">
+              <rect width="8" height="13" x="8" y="2" fill="currentColor" rx="4" />
+              <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 11a7 7 0 1 0 14 0m-7 10v-2" />
+            </g>
+          </svg>
+        </div>
+        <div className="ball">
+          <div className="container-lines" />
+          <div className="container-rings" />
         </div>
       </div>
+
+      {/* Gooey filter used by .ball — kept out of layout flow */}
+      <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
+        <filter id="orb-gooey">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="6" />
+          <feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -10" />
+        </filter>
+      </svg>
     </div>
   )
 }

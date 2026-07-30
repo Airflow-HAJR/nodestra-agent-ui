@@ -17,12 +17,6 @@ function blobToBase64(blob: Blob): Promise<string> {
   })
 }
 
-function getAudioFormat(mimeType: string): 'webm' | 'ogg' | 'mp4' {
-  if (mimeType.includes('ogg')) return 'ogg'
-  if (mimeType.includes('mp4')) return 'mp4'
-  return 'webm'
-}
-
 // Estimate MP3 duration from base64 length (128kbps)
 function estimateDurationMs(base64: string): number {
   const bytes = Math.floor(base64.length * 0.75)
@@ -37,11 +31,17 @@ export interface VoiceAgentHook {
   audioLevel: number
   micPermission: 'unknown' | 'granted' | 'denied' | 'requesting'
   micError: string | null
-  streamingText: string      // text being revealed as audio plays
-  isStreaming: boolean       // true while agent audio + text reveal is happening
+  streamingText: string          // agent text being revealed as its audio plays
+  isStreaming: boolean           // true while agent audio + text reveal is happening
+  partialTranscript: string      // the user's own words, growing live while they speak
+  thinkingLabel: string | null   // tool-specific status while thinking, e.g. "Charting course..."
   mapAction: MapActionPayload | null
+  muted: boolean
   startListening: () => Promise<void>
   stopListening: () => Promise<void>
+  toggleMute: () => void
+  interrupt: () => void
+  sendText: (text: string) => void
   clearMessages: () => void
   clearMapAction: () => void
   unlockAudio: () => void
@@ -53,24 +53,37 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
   const [messages, setMessages] = useState<Message[]>([])
   const [streamingText, setStreamingText] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
+  const [partialTranscript, setPartialTranscript] = useState('')
+  const [thinkingLabel, setThinkingLabel] = useState<string | null>(null)
   const [mapAction, setMapAction] = useState<MapActionPayload | null>(null)
+  const [muted, setMuted] = useState(false)
 
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectAttemptsRef = useRef(0)
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isMountedRef = useRef(true)
   const configRef = useRef(config)
+  const agentStateRef = useRef<AgentState>('idle')
 
   // Audio
   const audioCtxRef = useRef<AudioContext | null>(null)
   const audioQueueRef = useRef<Array<{ base64: string; text: string }>>([])
   const isPlayingRef = useRef(false)
+  const currentSourceRef = useRef<AudioBufferSourceNode | null>(null)
   const streamIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const listeningStartInFlightRef = useRef(false)
+  const micGrantedRef = useRef(false)
+
+  // Live-transcription forwarding — true only once real speech has been
+  // detected in the current mic-open session (see handleSpeechStart below).
+  const isForwardingRef = useRef(false)
+  const chunkChainRef = useRef<Promise<void>>(Promise.resolve())
 
   // Pending agent text (arrives before audio)
   const pendingAgentTextRef = useRef<string | null>(null)
 
   useEffect(() => { configRef.current = config }, [config])
+  useEffect(() => { agentStateRef.current = agentState }, [agentState])
 
   const recorder = useAudioRecorder()
   const stopListeningRef = useRef<(() => Promise<void>) | null>(null)
@@ -167,7 +180,8 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
       const source = ctx.createBufferSource()
       source.buffer = buffer
       source.connect(ctx.destination)
-      source.onended = () => { playNextAudio() }
+      source.onended = () => { currentSourceRef.current = null; playNextAudio() }
+      currentSourceRef.current = source
       source.start(0)
     } catch (e) {
       console.error('Audio playback error:', e)
@@ -179,8 +193,28 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
     const text = pendingAgentTextRef.current ?? ''
     pendingAgentTextRef.current = null
     audioQueueRef.current.push({ base64, text })
-    if (!isPlayingRef.current) playNextAudio()
+    // Hold playback until the user has accepted the mic permission prompt —
+    // queued audio is flushed once that happens (see startListening).
+    if (micGrantedRef.current && !isPlayingRef.current) playNextAudio()
   }, [playNextAudio])
+
+  // Barge-in: let the user cut the agent off mid-speech.
+  const interrupt = useCallback(() => {
+    audioQueueRef.current = []
+    pendingAgentTextRef.current = null
+    clearStream()
+    setStreamingText('')
+    setIsStreaming(false)
+    if (currentSourceRef.current) {
+      try {
+        currentSourceRef.current.onended = null
+        currentSourceRef.current.stop()
+      } catch { /* already stopped */ }
+      currentSourceRef.current = null
+    }
+    isPlayingRef.current = false
+    setAgentState('idle')
+  }, [clearStream])
 
   // ─── WebSocket ──────────────────────────────────────────────────────
   const scheduleReconnect = useCallback(() => {
@@ -221,7 +255,7 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
           switch (msg.type) {
             case 'transcript':
               if (msg.role === 'user') {
-                // Add user message immediately
+                setPartialTranscript('')
                 setMessages(prev => [...prev, {
                   id: `${Date.now()}-${Math.random()}`,
                   role: 'user',
@@ -234,6 +268,10 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
                 pendingAgentTextRef.current = msg.text
               }
               break
+            case 'partial_transcript':
+              // Live growing transcript of the user's own speech, before they've stopped talking.
+              setPartialTranscript(msg.text)
+              break
             case 'audio':
               enqueueAudio(msg.data)
               break
@@ -242,8 +280,10 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
               // our playback queue controls when we return to idle.
               if (isPlayingRef.current || audioQueueRef.current.length > 0) break
               setAgentState(msg.state)
+              setThinkingLabel(msg.state === 'thinking' ? (msg.label ?? null) : null)
               break
             case 'error':
+              setPartialTranscript('')
               setMessages(prev => [...prev, {
                 id: `err-${Date.now()}`,
                 role: 'agent',
@@ -294,30 +334,126 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
     }
   }, [config.language, config.userId])
 
-  // ─── PTT ────────────────────────────────────────────────────────────
+  // ─── Live-streamed chunk forwarding ───────────────────────────────────
+  // The recorder only ever starts producing chunks once real speech has been
+  // detected (see useAudioRecorder), so every chunk it hands us here belongs
+  // to the current utterance — just relay them to the server in strict order.
+  const handleChunk = useCallback((blob: Blob) => {
+    chunkChainRef.current = chunkChainRef.current.then(async () => {
+      if (wsRef.current?.readyState !== WebSocket.OPEN) return
+      try {
+        const base64 = await blobToBase64(blob)
+        wsRef.current.send(JSON.stringify({ type: 'audio_chunk', data: base64 }))
+      } catch { /* drop this chunk */ }
+    })
+  }, [])
+
+  // Fires the instant the VAD detects the user has started talking — this is
+  // what makes both continuous listening and mid-speech barge-in possible.
+  const handleSpeechStart = useCallback(() => {
+    isForwardingRef.current = true
+    if (agentStateRef.current === 'speaking') interrupt()
+    setAgentState('listening')
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'audio_start', language: configRef.current.language }))
+    }
+  }, [interrupt])
+
+  // ─── Mic monitoring / continuous listening ───────────────────────────
   const stopListening = useCallback(async () => {
-    if (agentState !== 'listening') return
+    if (!isForwardingRef.current) return
+    isForwardingRef.current = false
     stopListeningRef.current = null
     setAgentState('thinking')
-    try {
-      const blob = await recorder.stop()
-      const base64 = await blobToBase64(blob)
-      const format = getAudioFormat(blob.type || 'audio/webm')
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({ type: 'audio', data: base64, language: configRef.current.language, format }))
-      } else {
-        setAgentState('idle')
-      }
-    } catch { setAgentState('idle') }
-  }, [agentState, recorder])
+    try { await recorder.stop() } catch { /* already stopped */ }
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'audio_end' }))
+    } else {
+      setAgentState('idle')
+    }
+  }, [recorder])
 
   useEffect(() => { stopListeningRef.current = stopListening }, [stopListening])
 
-  const startListening = useCallback(async () => {
-    if (agentState !== 'idle' && agentState !== 'error') return
-    await recorder.start({ onSilence: () => { stopListeningRef.current?.() } })
-    setAgentState('listening')
-  }, [agentState, recorder])
+  // Opens the mic and starts VAD monitoring. `silent` keeps the visible state
+  // as-is (used to open the mic proactively while the agent is speaking, for
+  // barge-in) — otherwise the state flips to 'listening' once the mic is open.
+  const startListening = useCallback(async (opts?: { silent?: boolean }) => {
+    if (recorder.isRecording) {
+      if (!opts?.silent) setAgentState('listening')
+      return
+    }
+    if (listeningStartInFlightRef.current) return
+    listeningStartInFlightRef.current = true
+    try {
+      await recorder.start({
+        onSpeechStart: handleSpeechStart,
+        onSilence: () => { stopListeningRef.current?.() },
+        onChunk: handleChunk,
+        // While the agent is talking, the mic can easily pick up its own
+        // voice through the speakers (no headphones). Require noticeably
+        // louder, sustained audio before treating it as a real interruption
+        // — a normal listening turn stays fast/instant-triggered.
+        ...(opts?.silent ? { speechThreshold: 0.18, speechSustainMs: 180 } : {}),
+      })
+
+      if (!micGrantedRef.current) {
+        // First-ever grant: this permission prompt is the user gesture that
+        // unlocks playback — release any agent audio that arrived earlier.
+        micGrantedRef.current = true
+        unlockAudio()
+        if (audioQueueRef.current.length > 0 && !isPlayingRef.current) {
+          playNextAudio()
+          return
+        }
+      }
+
+      if (!opts?.silent) setAgentState('listening')
+    } catch {
+      if (!opts?.silent) setAgentState('error')
+    } finally {
+      listeningStartInFlightRef.current = false
+    }
+  }, [recorder, unlockAudio, playNextAudio, handleSpeechStart, handleChunk])
+
+  // Keep the mic proactively open (and thus VAD-monitored for barge-in)
+  // whenever the agent is idle or speaking and the user hasn't muted —
+  // this is what turns tap-to-talk into an always-on voice mode.
+  useEffect(() => {
+    if (muted) return
+    if (connectionState !== 'connected') return
+    if (agentState === 'idle') { startListening(); return }
+    if (agentState === 'speaking') { startListening({ silent: true }); return }
+  }, [agentState, connectionState, muted, startListening])
+
+  const toggleMute = useCallback(() => {
+    setMuted(prev => {
+      const next = !prev
+      if (next && recorder.isRecording) {
+        isForwardingRef.current = false
+        setPartialTranscript('')
+        recorder.stop().catch(() => {})
+        if (agentStateRef.current === 'listening') setAgentState('idle')
+      }
+      return next
+    })
+  }, [recorder])
+
+  const sendText = useCallback((text: string) => {
+    const trimmed = text.trim()
+    if (!trimmed) return
+    if (recorder.isRecording) {
+      isForwardingRef.current = false
+      setPartialTranscript('')
+      recorder.stop().catch(() => {})
+    }
+    setAgentState('thinking')
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'text', text: trimmed, language: configRef.current.language }))
+    } else {
+      setAgentState('idle')
+    }
+  }, [recorder])
 
   const clearMessages = useCallback(() => setMessages([]), [])
   const clearMapAction = useCallback(() => setMapAction(null), [])
@@ -328,8 +464,9 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
     audioLevel: recorder.audioLevel,
     micPermission: recorder.permissionState,
     micError: recorder.error,
-    streamingText, isStreaming,
+    streamingText, isStreaming, partialTranscript, thinkingLabel,
     mapAction, clearMapAction,
+    muted, toggleMute, interrupt, sendText,
     startListening, stopListening, clearMessages, unlockAudio,
   }
 }
