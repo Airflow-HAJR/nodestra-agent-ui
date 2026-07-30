@@ -6,8 +6,23 @@ import { App } from './App'
 const rootElement = document.getElementById('root')
 if (!rootElement) throw new Error('Root element not found')
 
-createRoot(rootElement).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+const isOrbTest = new URLSearchParams(window.location.search).has('orbtest')
+
+async function render() {
+  if (isOrbTest) {
+    const { OrbTestPage } = await import('./components/orbtest/OrbTestPage')
+    createRoot(rootElement!).render(
+      <StrictMode>
+        <OrbTestPage />
+      </StrictMode>,
+    )
+    return
+  }
+  createRoot(rootElement!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  )
+}
+
+render()
