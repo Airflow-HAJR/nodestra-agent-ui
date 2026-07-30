@@ -242,6 +242,18 @@ body {
   transition: filter 0.4s ease, opacity 0.4s ease;
 }
 
+/* Plain-CSS glow behind the "circle" theme's flat fill — pure CSS,
+   nothing WebGL-dependent, so it always paints alongside the orb. */
+.orb-container::before {
+  content: "";
+  position: absolute;
+  inset: 8%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(145, 71, 255, 0.35), transparent 70%);
+  filter: blur(18px);
+  pointer-events: none;
+}
+
 .orb-container--muted {
   filter: grayscale(1);
   opacity: 0.6;

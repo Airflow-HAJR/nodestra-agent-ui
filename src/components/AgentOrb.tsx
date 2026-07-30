@@ -23,17 +23,27 @@ function useOrbSize() {
 }
 
 export function AgentOrb({ state, audioLevel = 0, muted = false, onInterrupt }: AgentOrbProps) {
-  const isSpeaking = state === 'speaking' && !muted
   const size = useOrbSize()
 
   return (
     <div
       className={`orb-container${muted ? ' orb-container--muted' : ''}`}
-      onClick={isSpeaking ? onInterrupt : undefined}
       role="img"
       aria-label={muted ? 'Agent is muted' : `Agent is ${state}`}
     >
-      <Orb state={muted ? 'idle' : state} volume={muted ? 0 : audioLevel} theme="cloud" size={size} interactive={false} />
+      {/* "circle" is plain CSS/DOM (no WebGL canvas, no hidden-until-active
+          gating) so it always paints, including in idle state on iOS
+          Safari — the "cloud" theme depends on a WebGL shader that stays
+          invisible in idle state and can silently fail on mobile. */}
+      <Orb
+        state={muted ? 'idle' : state}
+        volume={muted ? 0 : audioLevel}
+        theme="circle"
+        size={size}
+        interactive
+        onStart={() => {}}
+        onStop={() => onInterrupt?.()}
+      />
     </div>
   )
 }
