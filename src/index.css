@@ -259,6 +259,7 @@ body {
     drop-shadow(0 0 12px rgba(255, 255, 255, 1))
     drop-shadow(0 0 12px rgba(145, 71, 255, 0.3))
     drop-shadow(0 0 5px rgba(255, 0, 0, 0.3));
+  will-change: transform, filter;
 }
 .orb:hover,
 .orb.orb--intense {
@@ -330,6 +331,13 @@ body {
   background-color: #ff0002;
   filter: url(#orb-gooey);
   animation: circle2 4.2s ease-in-out infinite;
+  /* iOS Safari sometimes leaves SVG-filtered elements unpainted (or half
+     painted) until something forces a GPU layer — nudge it onto one. */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  will-change: filter, transform;
 }
 
 .container-lines {

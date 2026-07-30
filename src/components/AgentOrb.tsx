@@ -35,9 +35,12 @@ export function AgentOrb({ state, audioLevel = 0, muted = false, onInterrupt }: 
         </div>
       </div>
 
-      {/* Gooey filter used by .ball — kept out of layout flow */}
-      <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
-        <filter id="orb-gooey">
+      {/* Gooey filter used by .ball — kept out of layout flow.
+          iOS Safari fails to paint filters defined inside a 0x0 SVG on first
+          render, and clips the blur without an explicit filter region — use
+          a 1x1 visibility:hidden SVG and widen the region instead. */}
+      <svg width="1" height="1" style={{ position: 'absolute', visibility: 'hidden' }} aria-hidden="true">
+        <filter id="orb-gooey" x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur in="SourceGraphic" stdDeviation="6" />
           <feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -10" />
         </filter>
