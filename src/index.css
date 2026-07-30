@@ -287,26 +287,15 @@ body {
   --orb-glow: rgba(239, 68, 68, 0.55);
 }
 
-/* Soft halo behind the sphere. Box is sized well beyond the visible glow
-   radius so the blur fully dissipates to nothing before it hits the box's
-   own edge — too little margin here is what leaves a faint hard-edged
-   rectangle visible against the page background. */
-.orb-container::before {
-  content: "";
-  position: absolute;
-  inset: -45%;
-  border-radius: 50%;
-  background: radial-gradient(circle, var(--orb-glow), transparent 42%);
-  filter: blur(18px);
-  transition: background 0.6s ease;
-  pointer-events: none;
-}
-
 .orb-container--muted {
   filter: grayscale(1);
   opacity: 0.6;
 }
 
+/* The glow is pure box-shadow, not a separate filter:blur() pseudo-element
+   — box-shadow always fades smoothly to fully transparent with no
+   bounding box of its own to clip against, which is what kept leaving a
+   faint hard edge visible on the page background before. */
 .orb-core {
   position: relative;
   width: 72%;
@@ -320,7 +309,9 @@ body {
     radial-gradient(circle at 68% 72%, var(--orb-c2), transparent 55%),
     radial-gradient(circle at 50% 50%, var(--orb-c1), var(--orb-c3) 88%);
   box-shadow:
-    0 0 26px 2px var(--orb-glow),
+    0 0 14px 0 var(--orb-glow),
+    0 0 34px 6px var(--orb-glow),
+    0 0 60px 14px var(--orb-glow),
     inset 0 0 18px rgba(255, 255, 255, 0.25);
   transform: scale(var(--listen-scale, 1));
   transition: box-shadow 0.6s ease, transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -383,11 +374,11 @@ body {
 .orb-core__grain {
   position: absolute;
   inset: -25%;
-  background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjAiIGhlaWdodD0iMTIwIj48ZmlsdGVyIGlkPSJuIj48ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iMC44NSIgbnVtT2N0YXZlcz0iMiIgc3RpdGNoVGlsZXM9InN0aXRjaCIvPjxmZUNvbG9yTWF0cml4IHR5cGU9Im1hdHJpeCIgdmFsdWVzPSIwIDAgMCAwIDEgIDAgMCAwIDAgMSAgMCAwIDAgMCAxICAwIDAgMCAwLjU1IDAiLz48L2ZpbHRlcj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWx0ZXI9InVybCglMjNuKSIvPjwvc3ZnPg==");
-  background-size: 140px 140px;
+  background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI5MCIgaGVpZ2h0PSI5MCI+PGZpbHRlciBpZD0ibiI+PGZlVHVyYnVsZW5jZSB0eXBlPSJmcmFjdGFsTm9pc2UiIGJhc2VGcmVxdWVuY3k9IjEuMzUiIG51bU9jdGF2ZXM9IjMiIHN0aXRjaFRpbGVzPSJzdGl0Y2giLz48ZmVDb2xvck1hdHJpeCB0eXBlPSJtYXRyaXgiIHZhbHVlcz0iMCAwIDAgMCAxICAwIDAgMCAwIDEgIDAgMCAwIDAgMSAgMCAwIDAgMS40IC0wLjE1Ii8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsdGVyPSJ1cmwoJTIzbikiLz48L3N2Zz4=");
+  background-size: 70px 70px;
   mix-blend-mode: overlay;
-  opacity: 0.35;
-  animation: grain-flicker 0.6s steps(4) infinite;
+  opacity: 0.6;
+  animation: grain-flicker 0.5s steps(4) infinite;
 }
 
 @keyframes orb-breathe {
