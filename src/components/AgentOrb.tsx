@@ -1,4 +1,5 @@
-import type { CSSProperties } from 'react'
+import { useEffect, useState } from 'react'
+import { Orb } from 'orb-ui'
 import type { AgentState } from '../lib/types'
 
 interface AgentOrbProps {
@@ -8,9 +9,22 @@ interface AgentOrbProps {
   onInterrupt?: () => void
 }
 
+function useOrbSize() {
+  const compute = () => Math.min(window.innerWidth * 0.58, 213)
+  const [size, setSize] = useState(compute)
+
+  useEffect(() => {
+    const onResize = () => setSize(compute())
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  return size
+}
+
 export function AgentOrb({ state, audioLevel = 0, muted = false, onInterrupt }: AgentOrbProps) {
   const isSpeaking = state === 'speaking' && !muted
-  const listenScale = state === 'listening' ? 1 + Math.min(audioLevel, 1) * 0.12 : 1
+  const size = useOrbSize()
 
   return (
     <div
@@ -18,18 +32,20 @@ export function AgentOrb({ state, audioLevel = 0, muted = false, onInterrupt }: 
       role="img"
       aria-label={muted ? 'Agent is muted' : `Agent is ${state}`}
       onClick={isSpeaking ? onInterrupt : undefined}
-      data-state={muted ? 'idle' : state}
     >
-      <div
-        className={`orb-core${isSpeaking ? ' orb-core--intense' : ''}`}
-        style={{ '--listen-scale': listenScale } as CSSProperties}
-      >
-        <div className="orb-core__blob orb-core__blob--a" />
-        <div className="orb-core__blob orb-core__blob--b" />
-        <div className="orb-core__blob orb-core__blob--c" />
-        <div className="orb-core__sheen" />
-        <div className="orb-core__grain" />
-      </div>
+      {/* interactive={false} — with it true, the theme forces the canvas
+          down to a near-zero scale in idle/error and only shows a tiny
+          "tap to start" dot instead; false keeps it at full scale, and the
+          CSS below forces its opacity so it never fades out on idle/error
+          either. Volume already drives the sphere's own size pulse while
+          speaking — nothing extra needed for that. */}
+      <Orb
+        state={muted ? 'idle' : state}
+        volume={muted ? 0 : audioLevel}
+        theme="cloud"
+        size={size}
+        interactive={false}
+      />
     </div>
   )
 }

@@ -231,11 +231,8 @@ body {
   padding: 12px 0;
 }
 
-/* Custom CSS-only orb. Deliberately avoids SVG `filter: url(#id)` (WebKit
-   clips/fails to paint those on iOS) and `mask-composite` (WebKit needs
-   different keyword values than the standard) — everything here is plain
-   gradients, blend modes, and the simple `filter: blur()/grayscale()`
-   functions, which all render reliably cross-browser. */
+/* orb-ui.com's "cloud" theme (npm package `orb-ui`), driven in controlled
+   mode by our own AgentState. */
 
 .orb-container {
   position: relative;
@@ -246,45 +243,6 @@ body {
   justify-content: center;
   flex-shrink: 0;
   transition: filter 0.4s ease, opacity 0.4s ease;
-
-  --orb-c1: #7c6cf5;
-  --orb-c2: #a78bfa;
-  --orb-c3: #4c3fc9;
-  --orb-glow: rgba(124, 108, 245, 0.5);
-  --orb-spin: 9s;
-  --orb-breathe: 4.5s;
-}
-
-.orb-container[data-state='listening'] {
-  --orb-c1: #6ea8fe;
-  --orb-c2: #bfe0ff;
-  --orb-c3: #3b6fd9;
-  --orb-glow: rgba(110, 168, 254, 0.55);
-  --orb-breathe: 2.4s;
-}
-
-.orb-container[data-state='thinking'] {
-  --orb-c1: #8b5cf6;
-  --orb-c2: #c4b5fd;
-  --orb-c3: #5b21b6;
-  --orb-glow: rgba(139, 92, 246, 0.55);
-  --orb-spin: 3.2s;
-}
-
-.orb-container[data-state='speaking'] {
-  --orb-c1: #f97066;
-  --orb-c2: #ffc2a8;
-  --orb-c3: #c2410c;
-  --orb-glow: rgba(249, 112, 102, 0.6);
-  --orb-breathe: 1.5s;
-  --orb-spin: 4s;
-}
-
-.orb-container[data-state='error'] {
-  --orb-c1: #ef4444;
-  --orb-c2: #fca5a5;
-  --orb-c3: #991b1b;
-  --orb-glow: rgba(239, 68, 68, 0.55);
 }
 
 .orb-container--muted {
@@ -292,136 +250,12 @@ body {
   opacity: 0.6;
 }
 
-/* The glow is pure box-shadow, not a separate filter:blur() pseudo-element
-   — box-shadow always fades smoothly to fully transparent with no
-   bounding box of its own to clip against, which is what kept leaving a
-   faint hard edge visible on the page background before. */
-.orb-core {
-  position: relative;
-  width: 72%;
-  height: 72%;
-  border-radius: 50%;
-  overflow: hidden;
-  isolation: isolate;
-  cursor: default;
-  background:
-    radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 32%),
-    radial-gradient(circle at 68% 72%, var(--orb-c2), transparent 55%),
-    radial-gradient(circle at 50% 50%, var(--orb-c1), var(--orb-c3) 88%);
-  box-shadow:
-    0 0 14px 0 var(--orb-glow),
-    0 0 34px 6px var(--orb-glow),
-    0 0 60px 14px var(--orb-glow),
-    inset 0 0 18px rgba(255, 255, 255, 0.25);
-  transform: scale(var(--listen-scale, 1));
-  transition: box-shadow 0.6s ease, transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  animation:
-    orb-breathe var(--orb-breathe, 4.5s) ease-in-out infinite,
-    orb-morph 9s ease-in-out infinite;
-}
-
-.orb-core--intense {
-  cursor: pointer;
-  animation:
-    orb-breathe var(--orb-breathe, 4.5s) ease-in-out infinite,
-    orb-morph 2.6s ease-in-out infinite;
-}
-
-/* Drifting color blobs — an "oil in water" look — blended into the base
-   sphere fill. Each drifts on its own path/timing so they never sync up. */
-.orb-core__blob {
-  position: absolute;
-  inset: -25%;
-  border-radius: 50%;
-  mix-blend-mode: soft-light;
-  will-change: transform;
-}
-.orb-core__blob--a {
-  background: radial-gradient(circle at 50% 50%, var(--orb-c2), transparent 58%);
-  animation: blob-drift-a 7s ease-in-out infinite;
-}
-.orb-core__blob--b {
-  background: radial-gradient(circle at 50% 50%, var(--orb-c1), transparent 55%);
-  animation: blob-drift-b 9.5s ease-in-out infinite;
-  animation-delay: -3s;
-}
-.orb-core__blob--c {
-  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.6), transparent 50%);
-  animation: blob-drift-a 6s ease-in-out infinite reverse;
-  animation-delay: -1.5s;
-  opacity: 0.7;
-}
-
-.orb-core__sheen {
-  position: absolute;
-  inset: -25%;
-  border-radius: 50%;
-  background: conic-gradient(
-    from 0deg,
-    transparent 0deg,
-    rgba(255, 255, 255, 0.4) 60deg,
-    transparent 130deg,
-    rgba(255, 255, 255, 0.22) 230deg,
-    transparent 300deg
-  );
-  mix-blend-mode: soft-light;
-  animation: orb-spin var(--orb-spin, 9s) linear infinite;
-}
-
-/* Fine grain — a small tiled noise raster used as an ordinary background
-   image (not a live SVG filter), so it decodes and renders like any other
-   image with none of the WebKit live-filter clipping bugs. */
-.orb-core__grain {
-  position: absolute;
-  inset: -25%;
-  background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI5MCIgaGVpZ2h0PSI5MCI+PGZpbHRlciBpZD0ibiI+PGZlVHVyYnVsZW5jZSB0eXBlPSJmcmFjdGFsTm9pc2UiIGJhc2VGcmVxdWVuY3k9IjEuMzUiIG51bU9jdGF2ZXM9IjMiIHN0aXRjaFRpbGVzPSJzdGl0Y2giLz48ZmVDb2xvck1hdHJpeCB0eXBlPSJtYXRyaXgiIHZhbHVlcz0iMCAwIDAgMCAxICAwIDAgMCAwIDEgIDAgMCAwIDAgMSAgMCAwIDAgMS40IC0wLjE1Ii8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsdGVyPSJ1cmwoJTIzbikiLz48L3N2Zz4=");
-  background-size: 70px 70px;
-  mix-blend-mode: overlay;
-  opacity: 0.6;
-  animation: grain-flicker 0.5s steps(4) infinite;
-}
-
-@keyframes orb-breathe {
-  0%, 100% { filter: brightness(1) saturate(1); }
-  50%      { filter: brightness(1.1) saturate(1.15); }
-}
-
-@keyframes orb-spin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
-}
-
-/* Organic squash: the sphere's own border-radius corners flow in and out
-   asymmetrically, giving it a soft, liquid, "breathing" silhouette instead
-   of a perfectly rigid circle. Always-on, but much stronger/faster while
-   speaking (applied via .orb-core--intense above). */
-@keyframes orb-morph {
-  0%, 100% { border-radius: 50%; }
-  25%      { border-radius: 46% 54% 62% 38% / 41% 44% 56% 59%; }
-  50%      { border-radius: 58% 42% 38% 62% / 55% 60% 40% 45%; }
-  75%      { border-radius: 40% 60% 55% 45% / 62% 38% 47% 53%; }
-}
-
-@keyframes blob-drift-a {
-  0%   { transform: translate(-10%, -6%) scale(1); }
-  33%  { transform: translate(9%, 11%) scale(1.18); }
-  66%  { transform: translate(-6%, 9%) scale(0.88); }
-  100% { transform: translate(-10%, -6%) scale(1); }
-}
-
-@keyframes blob-drift-b {
-  0%   { transform: translate(8%, -9%) scale(1.05); }
-  40%  { transform: translate(-11%, 4%) scale(0.85); }
-  70%  { transform: translate(4%, 10%) scale(1.2); }
-  100% { transform: translate(8%, -9%) scale(1.05); }
-}
-
-@keyframes grain-flicker {
-  0%   { background-position: 0 0; }
-  25%  { background-position: -18px 6px; }
-  50%  { background-position: 10px -12px; }
-  75%  { background-position: -8px -6px; }
-  100% { background-position: 0 0; }
+/* The theme's own JS fades the canvas to opacity 0 whenever state is idle
+   or error (by design, meant as a "tap to start" affordance) — force it to
+   stay visible in every state instead. `!important` is required to win
+   over the inline style the library sets on every animation frame. */
+.orb-container canvas {
+  opacity: 1 !important;
 }
 
 .orb-status {
