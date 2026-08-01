@@ -6,6 +6,9 @@ import {
   LISTENING_START_SOUND_URL, LISTENING_STOP_SOUND_URL,
 } from '../lib/constants'
 
+// Agent TTS playback volume — halved from the providers' native output level.
+const AGENT_OUTPUT_GAIN = 0.5
+
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -292,7 +295,10 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
       if (!playbackAnalyserRef.current) {
         const analyser = ctx.createAnalyser()
         analyser.fftSize = 512
-        analyser.connect(ctx.destination)
+        const gain = ctx.createGain()
+        gain.gain.value = AGENT_OUTPUT_GAIN
+        analyser.connect(gain)
+        gain.connect(ctx.destination)
         playbackAnalyserRef.current = analyser
       }
       startOutputLevelMonitor()
