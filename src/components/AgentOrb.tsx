@@ -26,6 +26,14 @@ export function AgentOrb({ state, audioLevel = 0, muted = false, onInterrupt }: 
   const isSpeaking = state === 'speaking' && !muted
   const size = useOrbSize()
 
+  // The library's own `volume`-driven pulse tops out around +21% scale on
+  // the inner canvas, which reads as barely-there. Layer an extra scale on
+  // our own container on top of that so the orb visibly swells with the
+  // agent's voice instead of just faintly shimmering. Only set this inline
+  // style while speaking — otherwise it would win (inline beats stylesheet)
+  // over the CSS `[data-state='listening']` shrink below.
+  const speakingScale = isSpeaking ? 1 + Math.min(audioLevel, 1) * 0.3 : undefined
+
   return (
     <div
       className={`orb-container${muted ? ' orb-container--muted' : ''}`}
@@ -33,6 +41,7 @@ export function AgentOrb({ state, audioLevel = 0, muted = false, onInterrupt }: 
       aria-label={muted ? 'Agent is muted' : `Agent is ${state}`}
       onClick={isSpeaking ? onInterrupt : undefined}
       data-state={state}
+      style={speakingScale !== undefined ? { transform: `scale(${speakingScale})` } : undefined}
     >
       {/* interactive={false} — with it true, the theme forces the canvas
           down to a near-zero scale in idle/error and only shows a tiny

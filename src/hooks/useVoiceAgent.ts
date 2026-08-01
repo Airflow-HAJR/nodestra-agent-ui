@@ -82,6 +82,7 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
   // agent talks over closed-mic playback.
   const playbackAnalyserRef = useRef<AnalyserNode | null>(null)
   const playbackLevelFrameRef = useRef<number | null>(null)
+  const smoothedOutputLevelRef = useRef(0)
   const prevAgentStateRef = useRef<AgentState>('idle')
 
   // Live-transcription forwarding — true only once real speech has been
@@ -153,6 +154,7 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
       playbackLevelFrameRef.current = null
     }
     setAgentOutputLevel(0)
+    smoothedOutputLevelRef.current = 0
   }, [])
 
   const startOutputLevelMonitor = useCallback(() => {
@@ -165,7 +167,15 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
       let sum = 0
       for (let i = 0; i < dataArray.length; i++) sum += dataArray[i] * dataArray[i]
       const rms = Math.sqrt(sum / dataArray.length)
-      setAgentOutputLevel(Math.min(1, rms * 4))
+      // Typical speech RMS rarely gets near the ceiling, so a plain linear
+      // gain leaves the orb's pulse looking almost flat. Push it harder and
+      // bend the curve (sqrt) so normal speaking volume already sits close
+      // to 1 instead of only the loudest syllables, then smooth frame-to-frame
+      // so the pulse reads as a breathing motion rather than raw-RMS jitter.
+      const boosted = Math.min(1, rms * 9)
+      const shaped = Math.sqrt(boosted)
+      smoothedOutputLevelRef.current += (shaped - smoothedOutputLevelRef.current) * 0.35
+      setAgentOutputLevel(smoothedOutputLevelRef.current)
       playbackLevelFrameRef.current = requestAnimationFrame(tick)
     }
     playbackLevelFrameRef.current = requestAnimationFrame(tick)
