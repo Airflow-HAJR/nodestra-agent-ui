@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, type MutableRefObject } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import type { AgentState, ConnectionState, MapActionPayload, Message, VoiceAgentConfig, ServerMessage } from '../lib/types'
 import { useAudioRecorder } from './useAudioRecorder'
 import {
@@ -87,8 +87,10 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
   const playbackLevelFrameRef = useRef<number | null>(null)
   const smoothedOutputLevelRef = useRef(0)
   const prevAgentStateRef = useRef<AgentState>('idle')
-  const listeningStartAudioRef = useRef<HTMLAudioElement | null>(null)
-  const listeningStopAudioRef = useRef<HTMLAudioElement | null>(null)
+  // Decoded once per URL and cached — see playSound below for why these ride
+  // on audioCtxRef instead of separate <audio> elements.
+  const sfxBuffersRef = useRef<Record<string, AudioBuffer | null>>({})
+  const sfxLoadingRef = useRef<Record<string, Promise<AudioBuffer> | undefined>>({})
 
   // Live-transcription forwarding — true only once real speech has been
   // detected in the current mic-open session (see handleSpeechStart below).
@@ -189,21 +191,52 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
   // Cue sounds marking VAD state transitions: one the instant the user's
   // speech is confirmed (entering 'listening'), the other the instant they
   // stop and the turn hands off to the agent (leaving 'listening' for
-  // 'thinking'). Lazily create each Audio element once and just rewind +
-  // replay it on repeat triggers, rather than allocating a new one per call.
-  const playSound = useCallback((ref: MutableRefObject<HTMLAudioElement | null>, src: string) => {
-    if (!ref.current) ref.current = new Audio(src)
-    const audio = ref.current
-    audio.currentTime = 0
-    audio.play().catch(() => {})
+  // 'thinking'). Played as decoded buffers through audioCtxRef — the same
+  // AudioContext the TTS playback already uses — instead of a bare `new
+  // Audio(src).play()`. iOS Safari blocks that unless the exact element has
+  // previously played inside a direct user-gesture handler; these fire from
+  // a VAD/timer callback, not a gesture, so a fresh <audio> element gets
+  // silently rejected. audioCtxRef is unlocked once, during the mic-permission
+  // gesture in startListening, and everything scheduled through it afterwards
+  // (buffers or nodes) keeps playing — exactly how agent speech works today.
+  const loadSfxBuffer = useCallback(async (ctx: AudioContext, url: string): Promise<AudioBuffer | null> => {
+    const cached = sfxBuffersRef.current[url]
+    if (cached) return cached
+    if (!sfxLoadingRef.current[url]) {
+      sfxLoadingRef.current[url] = fetch(url)
+        .then(r => r.arrayBuffer())
+        .then(ab => ctx.decodeAudioData(ab))
+    }
+    try {
+      const buffer = await sfxLoadingRef.current[url]
+      if (buffer) sfxBuffersRef.current[url] = buffer
+      return buffer ?? null
+    } catch {
+      sfxLoadingRef.current[url] = undefined
+      return null
+    }
   }, [])
+
+  const playSound = useCallback(async (url: string) => {
+    let ctx = audioCtxRef.current
+    if (!ctx || ctx.state === 'closed') return // not unlocked yet — nothing safe to play through
+    if (ctx.state === 'suspended') { try { await ctx.resume() } catch { /* stay silent */ } }
+    const buffer = await loadSfxBuffer(ctx, url)
+    if (!buffer) return
+    ctx = audioCtxRef.current
+    if (!ctx || ctx.state === 'closed') return
+    const source = ctx.createBufferSource()
+    source.buffer = buffer
+    source.connect(ctx.destination)
+    source.start(0)
+  }, [loadSfxBuffer])
 
   useEffect(() => {
     const prev = prevAgentStateRef.current
     if (agentState === 'listening' && prev !== 'listening') {
-      playSound(listeningStartAudioRef, LISTENING_START_SOUND_URL)
+      playSound(LISTENING_START_SOUND_URL)
     } else if (prev === 'listening' && agentState === 'thinking') {
-      playSound(listeningStopAudioRef, LISTENING_STOP_SOUND_URL)
+      playSound(LISTENING_STOP_SOUND_URL)
     }
     prevAgentStateRef.current = agentState
   }, [agentState, playSound])
