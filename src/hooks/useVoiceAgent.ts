@@ -29,6 +29,7 @@ export interface VoiceAgentHook {
   messages: Message[]
   isConnected: boolean
   audioLevel: number
+  agentOutputLevel: number
   micPermission: 'unknown' | 'granted' | 'denied' | 'requesting'
   micError: string | null
   streamingText: string          // agent text being revealed as its audio plays
@@ -57,6 +58,7 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
   const [thinkingLabel, setThinkingLabel] = useState<string | null>(null)
   const [mapAction, setMapAction] = useState<MapActionPayload | null>(null)
   const [muted, setMuted] = useState(false)
+  const [agentOutputLevel, setAgentOutputLevel] = useState(0)
 
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectAttemptsRef = useRef(0)
@@ -73,6 +75,14 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
   const streamIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const listeningStartInFlightRef = useRef(false)
   const micGrantedRef = useRef(false)
+
+  // Analyser sits inline in the *playback* graph (source -> analyser ->
+  // destination) so the orb can pulse its radius to the agent's own voice,
+  // not the mic's — audioLevel above is mic-only and stays silent while the
+  // agent talks over closed-mic playback.
+  const playbackAnalyserRef = useRef<AnalyserNode | null>(null)
+  const playbackLevelFrameRef = useRef<number | null>(null)
+  const prevAgentStateRef = useRef<AgentState>('idle')
 
   // Live-transcription forwarding — true only once real speech has been
   // detected in the current mic-open session (see handleSpeechStart below).
@@ -136,11 +146,65 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
     }, msPerChar)
   }, [clearStream])
 
+  // ─── Agent-voice output level (drives the orb's speaking pulse) ─────
+  const stopOutputLevelMonitor = useCallback(() => {
+    if (playbackLevelFrameRef.current !== null) {
+      cancelAnimationFrame(playbackLevelFrameRef.current)
+      playbackLevelFrameRef.current = null
+    }
+    setAgentOutputLevel(0)
+  }, [])
+
+  const startOutputLevelMonitor = useCallback(() => {
+    if (playbackLevelFrameRef.current !== null) return // already ticking
+    const dataArray = new Float32Array(512)
+    const tick = () => {
+      const analyser = playbackAnalyserRef.current
+      if (!analyser) { playbackLevelFrameRef.current = null; return }
+      analyser.getFloatTimeDomainData(dataArray)
+      let sum = 0
+      for (let i = 0; i < dataArray.length; i++) sum += dataArray[i] * dataArray[i]
+      const rms = Math.sqrt(sum / dataArray.length)
+      setAgentOutputLevel(Math.min(1, rms * 4))
+      playbackLevelFrameRef.current = requestAnimationFrame(tick)
+    }
+    playbackLevelFrameRef.current = requestAnimationFrame(tick)
+  }, [])
+
+  // Short synthesized chime marking the instant VAD confirms the user has
+  // started talking — gives an audible cue that the agent is now listening,
+  // to go with the orb's shrink (see index.css [data-state='listening']).
+  const playListenChime = useCallback(() => {
+    const ctx = audioCtxRef.current
+    if (!ctx || ctx.state === 'closed') return
+    const now = ctx.currentTime
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(660, now)
+    osc.frequency.exponentialRampToValueAtTime(880, now + 0.08)
+    gain.gain.setValueAtTime(0.0001, now)
+    gain.gain.exponentialRampToValueAtTime(0.16, now + 0.02)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18)
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.start(now)
+    osc.stop(now + 0.2)
+  }, [])
+
+  useEffect(() => {
+    if (agentState === 'listening' && prevAgentStateRef.current !== 'listening') {
+      playListenChime()
+    }
+    prevAgentStateRef.current = agentState
+  }, [agentState, playListenChime])
+
   // ─── Audio playback queue ───────────────────────────────────────────
   const playNextAudio = useCallback(async () => {
     const next = audioQueueRef.current.shift()
     if (!next) {
       isPlayingRef.current = false
+      stopOutputLevelMonitor()
       if (isMountedRef.current) {
         setAgentState('idle')
         setIsStreaming(false)
@@ -180,13 +244,21 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
 
       let ctx = audioCtxRef.current
-      if (!ctx || ctx.state === 'closed') { ctx = new AudioContext(); audioCtxRef.current = ctx }
+      if (!ctx || ctx.state === 'closed') { ctx = new AudioContext(); audioCtxRef.current = ctx; playbackAnalyserRef.current = null }
       if (ctx.state === 'suspended') await ctx.resume()
+
+      if (!playbackAnalyserRef.current) {
+        const analyser = ctx.createAnalyser()
+        analyser.fftSize = 512
+        analyser.connect(ctx.destination)
+        playbackAnalyserRef.current = analyser
+      }
+      startOutputLevelMonitor()
 
       const buffer = await ctx.decodeAudioData(bytes.buffer.slice(0))
       const source = ctx.createBufferSource()
       source.buffer = buffer
-      source.connect(ctx.destination)
+      source.connect(playbackAnalyserRef.current)
       source.onended = () => { currentSourceRef.current = null; playNextAudio() }
       currentSourceRef.current = source
       source.start(0)
@@ -194,7 +266,7 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
       console.error('Audio playback error:', e)
       playNextAudio()
     }
-  }, [streamText])
+  }, [streamText, startOutputLevelMonitor])
 
   const enqueueAudio = useCallback((base64: string) => {
     const text = pendingAgentTextRef.current ?? ''
@@ -233,8 +305,9 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
       currentSourceRef.current = null
     }
     isPlayingRef.current = false
+    stopOutputLevelMonitor()
     setAgentState('idle')
-  }, [clearStream])
+  }, [clearStream, stopOutputLevelMonitor])
 
   // ─── WebSocket ──────────────────────────────────────────────────────
   const scheduleReconnect = useCallback(() => {
@@ -350,10 +423,11 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
       isMountedRef.current = false
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current)
       clearStream()
+      stopOutputLevelMonitor()
       wsRef.current?.close()
       audioCtxRef.current?.close()
     }
-  }, [connect, clearStream])
+  }, [connect, clearStream, stopOutputLevelMonitor])
 
   useEffect(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -499,6 +573,7 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
     agentState, connectionState, messages,
     isConnected: connectionState === 'connected',
     audioLevel: recorder.audioLevel,
+    agentOutputLevel,
     micPermission: recorder.permissionState,
     micError: recorder.error,
     streamingText, isStreaming, partialTranscript, thinkingLabel,

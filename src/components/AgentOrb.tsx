@@ -38,8 +38,9 @@ export function AgentOrb({ state, audioLevel = 0, muted = false, onInterrupt }: 
           down to a near-zero scale in idle/error and only shows a tiny
           "tap to start" dot instead; false keeps it at full scale, and the
           CSS below forces its opacity so it never fades out on idle/error
-          either. Volume already drives the sphere's own size pulse while
-          speaking — nothing extra needed for that. */}
+          either. `volume` drives the sphere's own size pulse — while
+          speaking that's real playback amplitude from useVoiceAgent's
+          output analyser, not the mic (see App.tsx). */}
       <Orb
         state={muted ? 'idle' : state}
         volume={muted ? 0 : audioLevel}

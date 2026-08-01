@@ -277,7 +277,7 @@ export function App() {
       <div className="center-stage">
         <AgentOrb
           state={agent.agentState}
-          audioLevel={agent.audioLevel}
+          audioLevel={isSpeaking ? agent.agentOutputLevel : agent.audioLevel}
           muted={agent.muted}
           onInterrupt={agent.interrupt}
         />
