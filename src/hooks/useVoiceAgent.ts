@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, type RefObject } from 'react'
+import { useState, useEffect, useRef, useCallback, type MutableRefObject } from 'react'
 import type { AgentState, ConnectionState, MapActionPayload, Message, VoiceAgentConfig, ServerMessage } from '../lib/types'
 import { useAudioRecorder } from './useAudioRecorder'
 import {
@@ -191,7 +191,7 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
   // stop and the turn hands off to the agent (leaving 'listening' for
   // 'thinking'). Lazily create each Audio element once and just rewind +
   // replay it on repeat triggers, rather than allocating a new one per call.
-  const playSound = useCallback((ref: RefObject<HTMLAudioElement | null>, src: string) => {
+  const playSound = useCallback((ref: MutableRefObject<HTMLAudioElement | null>, src: string) => {
     if (!ref.current) ref.current = new Audio(src)
     const audio = ref.current
     audio.currentTime = 0
