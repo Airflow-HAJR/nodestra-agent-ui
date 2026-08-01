@@ -32,6 +32,7 @@ export function AgentOrb({ state, audioLevel = 0, muted = false, onInterrupt }: 
       role="img"
       aria-label={muted ? 'Agent is muted' : `Agent is ${state}`}
       onClick={isSpeaking ? onInterrupt : undefined}
+      data-state={state}
     >
       {/* interactive={false} — with it true, the theme forces the canvas
           down to a near-zero scale in idle/error and only shows a tiny
