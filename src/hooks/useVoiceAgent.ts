@@ -1,7 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, type RefObject } from 'react'
 import type { AgentState, ConnectionState, MapActionPayload, Message, VoiceAgentConfig, ServerMessage } from '../lib/types'
 import { useAudioRecorder } from './useAudioRecorder'
-import { RECONNECT_BASE_DELAY_MS, RECONNECT_MAX_DELAY_MS, RECONNECT_MAX_ATTEMPTS } from '../lib/constants'
+import {
+  RECONNECT_BASE_DELAY_MS, RECONNECT_MAX_DELAY_MS, RECONNECT_MAX_ATTEMPTS,
+  LISTENING_START_SOUND_URL, LISTENING_STOP_SOUND_URL,
+} from '../lib/constants'
 
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -84,6 +87,8 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
   const playbackLevelFrameRef = useRef<number | null>(null)
   const smoothedOutputLevelRef = useRef(0)
   const prevAgentStateRef = useRef<AgentState>('idle')
+  const listeningStartAudioRef = useRef<HTMLAudioElement | null>(null)
+  const listeningStopAudioRef = useRef<HTMLAudioElement | null>(null)
 
   // Live-transcription forwarding — true only once real speech has been
   // detected in the current mic-open session (see handleSpeechStart below).
@@ -181,33 +186,27 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
     playbackLevelFrameRef.current = requestAnimationFrame(tick)
   }, [])
 
-  // Short synthesized chime marking the instant VAD confirms the user has
-  // started talking — gives an audible cue that the agent is now listening,
-  // to go with the orb's shrink (see index.css [data-state='listening']).
-  const playListenChime = useCallback(() => {
-    const ctx = audioCtxRef.current
-    if (!ctx || ctx.state === 'closed') return
-    const now = ctx.currentTime
-    const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.type = 'sine'
-    osc.frequency.setValueAtTime(660, now)
-    osc.frequency.exponentialRampToValueAtTime(880, now + 0.08)
-    gain.gain.setValueAtTime(0.0001, now)
-    gain.gain.exponentialRampToValueAtTime(0.16, now + 0.02)
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18)
-    osc.connect(gain)
-    gain.connect(ctx.destination)
-    osc.start(now)
-    osc.stop(now + 0.2)
+  // Cue sounds marking VAD state transitions: one the instant the user's
+  // speech is confirmed (entering 'listening'), the other the instant they
+  // stop and the turn hands off to the agent (leaving 'listening' for
+  // 'thinking'). Lazily create each Audio element once and just rewind +
+  // replay it on repeat triggers, rather than allocating a new one per call.
+  const playSound = useCallback((ref: RefObject<HTMLAudioElement | null>, src: string) => {
+    if (!ref.current) ref.current = new Audio(src)
+    const audio = ref.current
+    audio.currentTime = 0
+    audio.play().catch(() => {})
   }, [])
 
   useEffect(() => {
-    if (agentState === 'listening' && prevAgentStateRef.current !== 'listening') {
-      playListenChime()
+    const prev = prevAgentStateRef.current
+    if (agentState === 'listening' && prev !== 'listening') {
+      playSound(listeningStartAudioRef, LISTENING_START_SOUND_URL)
+    } else if (prev === 'listening' && agentState === 'thinking') {
+      playSound(listeningStopAudioRef, LISTENING_STOP_SOUND_URL)
     }
     prevAgentStateRef.current = agentState
-  }, [agentState, playListenChime])
+  }, [agentState, playSound])
 
   // ─── Audio playback queue ───────────────────────────────────────────
   const playNextAudio = useCallback(async () => {

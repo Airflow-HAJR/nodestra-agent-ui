@@ -28,6 +28,8 @@ export const GOOGLE_MAPS_API_KEY = import.meta.env['VITE_GOOGLE_MAPS_API_KEY'] a
 // Public/ assets referenced by URL — must respect vite.config.ts's `base`
 // (e.g. '/oakland/') rather than assuming they're served from the domain root.
 export const AGENT_AVATAR_URL = `${import.meta.env.BASE_URL}agent-avatar.png`
+export const LISTENING_START_SOUND_URL = `${import.meta.env.BASE_URL}sounds/listening-start.wav`
+export const LISTENING_STOP_SOUND_URL = `${import.meta.env.BASE_URL}sounds/listening-stop.wav`
 
 export const RECONNECT_BASE_DELAY_MS = 1000
 export const RECONNECT_MAX_DELAY_MS = 30000
