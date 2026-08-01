@@ -242,6 +242,12 @@ body {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  border-radius: 50%;
+  /* The shader draws a circle on a square WebGL canvas and discards outside
+     it, leaving the corners meant to be transparent — some mobile GPUs
+     don't composite that alpha cleanly and show a faint white square edge
+     behind the circle. Clip to a circle here so that can never show. */
+  overflow: hidden;
   transition: filter 0.4s ease, opacity 0.4s ease, transform 0.25s ease;
 }
 
