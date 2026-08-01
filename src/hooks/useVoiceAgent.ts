@@ -6,8 +6,8 @@ import {
   LISTENING_START_SOUND_URL, LISTENING_STOP_SOUND_URL,
 } from '../lib/constants'
 
-// Agent TTS playback volume — halved from the providers' native output level.
-const AGENT_OUTPUT_GAIN = 0.5
+// Listening-start/stop chime volume — cut 60% from the source file's level.
+const CHIME_GAIN = 0.4
 
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -230,7 +230,10 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
     if (!ctx || ctx.state === 'closed') return
     const source = ctx.createBufferSource()
     source.buffer = buffer
-    source.connect(ctx.destination)
+    const gain = ctx.createGain()
+    gain.gain.value = CHIME_GAIN
+    source.connect(gain)
+    gain.connect(ctx.destination)
     source.start(0)
   }, [loadSfxBuffer])
 
@@ -295,10 +298,7 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
       if (!playbackAnalyserRef.current) {
         const analyser = ctx.createAnalyser()
         analyser.fftSize = 512
-        const gain = ctx.createGain()
-        gain.gain.value = AGENT_OUTPUT_GAIN
-        analyser.connect(gain)
-        gain.connect(ctx.destination)
+        analyser.connect(ctx.destination)
         playbackAnalyserRef.current = analyser
       }
       startOutputLevelMonitor()
