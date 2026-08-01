@@ -251,8 +251,8 @@ body {
    for --muted below), rotated from that base blue toward a distinct hue
    per state. Idle is left at the shader's native blue. */
 .orb-container[data-state='listening'] { filter: hue-rotate(-35deg) saturate(1.2); }
-.orb-container[data-state='thinking']  { filter: hue-rotate(45deg) saturate(1.15); }
-.orb-container[data-state='speaking']  { filter: hue-rotate(155deg) saturate(1.35) brightness(1.05); }
+.orb-container[data-state='thinking']  { filter: hue-rotate(155deg) saturate(1.15); }
+.orb-container[data-state='speaking']  { filter: hue-rotate(80deg) saturate(1.35) brightness(1.05); }
 .orb-container[data-state='error']     { filter: hue-rotate(125deg) saturate(1.4); }
 
 .orb-container--muted {
