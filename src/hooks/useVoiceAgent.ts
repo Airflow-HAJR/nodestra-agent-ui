@@ -455,6 +455,7 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
               setCheckpointPrompt({
                 routeId: msg.routeId,
                 segmentIndex: msg.segmentIndex,
+                stopIndex: msg.stopIndex,
                 poiName: msg.poiName,
                 promptText: msg.promptText,
                 gpsTarget: msg.gpsTarget,
@@ -462,7 +463,9 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
               break
             case 'checkpoint_resolved':
               setCheckpointPrompt(prev =>
-                prev && prev.routeId === msg.routeId && prev.segmentIndex === msg.segmentIndex ? null : prev
+                prev && prev.routeId === msg.routeId && prev.segmentIndex === msg.segmentIndex && prev.stopIndex === msg.stopIndex
+                  ? null
+                  : prev
               )
               break
           }
@@ -655,6 +658,7 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
         type: 'checkpoint_ack',
         routeId: prompt.routeId,
         segmentIndex: prompt.segmentIndex,
+        stopIndex: prompt.stopIndex,
         poiName: prompt.poiName,
       }))
     } else {

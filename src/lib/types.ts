@@ -77,6 +77,7 @@ export type MapActionPayload =
 export interface CheckpointPrompt {
   routeId: string
   segmentIndex: number
+  stopIndex: number
   poiName: string
   promptText: string
   gpsTarget: { lat: number; lng: number } | null
@@ -85,6 +86,7 @@ export interface CheckpointPrompt {
 export interface CheckpointResolved {
   routeId: string
   segmentIndex: number
+  stopIndex: number
   nextSegmentIndex: number
 }
 
@@ -109,4 +111,4 @@ export type ClientMessage =
   | { type: 'config'; language: string; userId?: string }
   | { type: 'ping' }
   | { type: 'location'; lat: number; lng: number; accuracy: number; timestamp: number }
-  | { type: 'checkpoint_ack'; routeId: string; segmentIndex: number; poiName: string }
+  | { type: 'checkpoint_ack'; routeId: string; segmentIndex: number; stopIndex: number; poiName: string }
