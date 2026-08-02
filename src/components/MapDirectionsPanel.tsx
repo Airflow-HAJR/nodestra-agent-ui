@@ -14,6 +14,7 @@ const ROUTE_COLOR = '#4285F4' // Google-blue — the route line must always rend
 const ORIGIN_COLOR = '#4285F4'
 const DESTINATION_COLOR = '#EA4335'
 const WAYPOINT_COLOR = '#34A853'
+const PORTAL_COLOR = '#FBBC05' // elevator/escalator/stairs — the checkpoint the user is heading to on this floor
 
 // Renders markers + a manually-drawn polyline on a real Google Maps JS
 // instance. We do NOT use the Embed API's `directions` mode here — Google's
@@ -108,6 +109,30 @@ function MapCanvas({ action, userLat, userLng }: { action: MapActionPayload; use
         })
         drawRoute(action.stops)
         map.fitBounds(bounds, 48)
+        return
+      }
+
+      if (action.type === 'show_trajectory') {
+        // Only the active floor's leg is drawn — later floors aren't
+        // reachable yet, so showing them would just be confusing. The
+        // final red destination pin only appears once we're on the last
+        // segment; earlier floors end at the portal (elevator/escalator/
+        // stairs) the user needs to take next, highlighted in amber.
+        const seg = action.segments[action.activeSegmentIndex] ?? action.segments[0]
+        if (seg && seg.stops.length > 0) {
+          const isFinalSegment = action.activeSegmentIndex === action.segments.length - 1
+          seg.stops.forEach((stop, i) => {
+            const isFirst = i === 0
+            const isLastOfSegment = i === seg.stops.length - 1
+            let color: string = WAYPOINT_COLOR
+            if (isFirst) color = ORIGIN_COLOR
+            else if (isLastOfSegment && isFinalSegment) color = DESTINATION_COLOR
+            else if (stop.isPortal) color = PORTAL_COLOR
+            addMarker(stop, stop.isPortal ? '↑' : String(i + 1), color)
+          })
+          drawRoute(seg.stops)
+          map.fitBounds(bounds, 48)
+        }
       }
     }).catch(() => { /* Maps SDK failed to load — panel just stays blank */ })
 
@@ -180,7 +205,10 @@ export function MapDirectionsPanel({ action, userLat, userLng, onDismiss }: Prop
   const destinationName = action.type === 'show_route'
     ? action.stops[action.stops.length - 1]?.name ?? ''
     : action.destination.name
-  const isDirections = action.type === 'show_directions' || action.type === 'show_route'
+  const isDirections = action.type === 'show_directions' || action.type === 'show_route' || action.type === 'show_trajectory'
+  const floorLabel = action.type === 'show_trajectory' && action.segments.length > 1
+    ? `${action.segments[action.activeSegmentIndex]?.levelName ?? ''} · Floor ${action.activeSegmentIndex + 1} of ${action.segments.length}`
+    : null
 
   return (
     <>
@@ -194,6 +222,7 @@ export function MapDirectionsPanel({ action, userLat, userLng, onDismiss }: Prop
           onDismiss={onDismiss}
         />
         <div className="map-directions-embed">
+          {floorLabel && <div className="map-floor-indicator">{floorLabel}</div>}
           <MapCanvas action={action} userLat={userLat} userLng={userLng} />
         </div>
       </div>
@@ -210,6 +239,7 @@ export function MapDirectionsPanel({ action, userLat, userLng, onDismiss }: Prop
               onDismiss={() => { setExpanded(false); onDismiss() }}
             />
             <div className="map-expand-embed">
+              {floorLabel && <div className="map-floor-indicator">{floorLabel}</div>}
               <MapCanvas action={action} userLat={userLat} userLng={userLng} />
             </div>
           </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import type { AgentState, ConnectionState, MapActionPayload, Message, VoiceAgentConfig, ServerMessage } from '../lib/types'
+import type { AgentState, CheckpointPrompt, ConnectionState, MapActionPayload, Message, VoiceAgentConfig, ServerMessage } from '../lib/types'
 import { useAudioRecorder } from './useAudioRecorder'
 import {
   RECONNECT_BASE_DELAY_MS, RECONNECT_MAX_DELAY_MS, RECONNECT_MAX_ATTEMPTS,
@@ -43,6 +43,7 @@ export interface VoiceAgentHook {
   partialTranscript: string      // the user's own words, growing live while they speak
   thinkingLabel: string | null   // tool-specific status while thinking, e.g. "Charting course..."
   mapAction: MapActionPayload | null
+  checkpointPrompt: CheckpointPrompt | null
   muted: boolean
   startListening: () => Promise<void>
   stopListening: () => Promise<void>
@@ -52,6 +53,8 @@ export interface VoiceAgentHook {
   clearMessages: () => void
   clearMapAction: () => void
   unlockAudio: () => void
+  sendLocation: (lat: number, lng: number, accuracy: number) => void
+  confirmCheckpoint: () => void
 }
 
 export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
@@ -63,6 +66,7 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
   const [partialTranscript, setPartialTranscript] = useState('')
   const [thinkingLabel, setThinkingLabel] = useState<string | null>(null)
   const [mapAction, setMapAction] = useState<MapActionPayload | null>(null)
+  const [checkpointPrompt, setCheckpointPrompt] = useState<CheckpointPrompt | null>(null)
   const [muted, setMuted] = useState(false)
   const [agentOutputLevel, setAgentOutputLevel] = useState(0)
 
@@ -447,6 +451,20 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
                 setMapAction(msg.action)
               }
               break
+            case 'checkpoint_prompt':
+              setCheckpointPrompt({
+                routeId: msg.routeId,
+                segmentIndex: msg.segmentIndex,
+                poiName: msg.poiName,
+                promptText: msg.promptText,
+                gpsTarget: msg.gpsTarget,
+              })
+              break
+            case 'checkpoint_resolved':
+              setCheckpointPrompt(prev =>
+                prev && prev.routeId === msg.routeId && prev.segmentIndex === msg.segmentIndex ? null : prev
+              )
+              break
           }
         } catch { /* ignore malformed */ }
       }
@@ -617,6 +635,33 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
   const clearMessages = useCallback(() => setMessages([]), [])
   const clearMapAction = useCallback(() => setMapAction(null), [])
 
+  // Streamed opportunistically as the device moves — throttled by the caller
+  // (useGeolocation's watchPosition callback), not on every render.
+  const sendLocation = useCallback((lat: number, lng: number, accuracy: number) => {
+    if (wsRef.current?.readyState !== WebSocket.OPEN) return
+    wsRef.current.send(JSON.stringify({ type: 'location', lat, lng, accuracy, timestamp: Date.now() }))
+  }, [])
+
+  // Tapping the on-screen checkpoint button — the server turns this into a
+  // synthetic user turn, so the same LLM judgment (incl. GPS sanity-check)
+  // that governs a spoken "I'm at the elevator" governs this too.
+  const confirmCheckpoint = useCallback(() => {
+    const prompt = checkpointPrompt
+    if (!prompt) return
+    setCheckpointPrompt(null)
+    setAgentState('thinking')
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'checkpoint_ack',
+        routeId: prompt.routeId,
+        segmentIndex: prompt.segmentIndex,
+        poiName: prompt.poiName,
+      }))
+    } else {
+      setAgentState('idle')
+    }
+  }, [checkpointPrompt])
+
   return {
     agentState, connectionState, messages,
     isConnected: connectionState === 'connected',
@@ -626,7 +671,9 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
     micError: recorder.error,
     streamingText, isStreaming, partialTranscript, thinkingLabel,
     mapAction, clearMapAction,
+    checkpointPrompt, confirmCheckpoint,
     muted, toggleMute, interrupt, sendText,
     startListening, stopListening, clearMessages, unlockAudio,
+    sendLocation,
   }
 }

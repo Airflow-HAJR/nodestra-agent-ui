@@ -2,10 +2,12 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { AgentOrb } from './components/AgentOrb'
 import { LanguageSelector } from './components/LanguageSelector'
 import { MapDirectionsPanel } from './components/MapDirectionsPanel'
+import { CheckpointConfirmButton } from './components/CheckpointConfirmButton'
 import { useVoiceAgent } from './hooks/useVoiceAgent'
 import { useGeolocation } from './hooks/useGeolocation'
 import { useTypewriter } from './hooks/useTypewriter'
 import { LANGUAGES, DEFAULT_LANGUAGE, LANGUAGE_STORAGE_KEY, USER_ID_STORAGE_KEY, WS_URL, generateUserId, GOOGLE_MAPS_API_KEY, AGENT_AVATAR_URL } from './lib/constants'
+import { haversineMeters } from './lib/geo'
 import type { Language } from './lib/types'
 
 const TWILIO_NUMBER = import.meta.env.VITE_TWILIO_NUMBER ?? ''
@@ -74,16 +76,44 @@ export function App() {
     }, MAP_COLLAPSE_ANIM_MS)
   }, [clearMapTimers])
 
+  // The map_action websocket message arrives the instant the backend tool
+  // runs — i.e. while the agent is still 'thinking', well before it starts
+  // talking. We don't want the map popping open mid-reasoning, so we hold
+  // onto the latest trajectory action and only reveal it once the agent
+  // actually starts speaking (agentState === 'speaking'). lastShownMapActionRef
+  // dedupes so the same action doesn't re-trigger the open animation every
+  // time this effect re-runs for an unrelated agentState change.
+  const lastShownMapActionRef = useRef<typeof agent.mapAction>(null)
   useEffect(() => {
     const action = agent.mapAction
-    if (!action || (action.type !== 'show_directions' && action.type !== 'show_route')) return
+    if (!action || (action.type !== 'show_directions' && action.type !== 'show_route' && action.type !== 'show_trajectory')) return
+    if (agent.agentState !== 'speaking') return
+    if (lastShownMapActionRef.current === action) return
+    lastShownMapActionRef.current = action
     clearMapTimers()
     setMapSheetClosing(false)
     setMapSheetOpen(true)
     mapAutoCloseTimerRef.current = setTimeout(collapseMapSheet, MAP_AUTO_CLOSE_MS)
-  }, [agent.mapAction, clearMapTimers, collapseMapSheet])
+  }, [agent.mapAction, agent.agentState, clearMapTimers, collapseMapSheet])
 
   useEffect(() => clearMapTimers, [clearMapTimers])
+
+  // Stream live GPS to the backend, throttled — at most once every 4s, or
+  // sooner if the fix moved more than ~5m, so the agent's checkpoint-advance
+  // logic (advance_map_trajectory) has something reasonably fresh to check
+  // against without flooding the socket on every watchPosition tick.
+  const lastSentLocationRef = useRef<{ lat: number; lng: number; t: number } | null>(null)
+  useEffect(() => {
+    if (geo.latitude === null || geo.longitude === null) return
+    const now = Date.now()
+    const last = lastSentLocationRef.current
+    const movedMeters = last
+      ? haversineMeters(last.lat, last.lng, geo.latitude, geo.longitude)
+      : Infinity
+    if (last && now - last.t < 4000 && movedMeters < 5) return
+    lastSentLocationRef.current = { lat: geo.latitude, lng: geo.longitude, t: now }
+    agent.sendLocation(geo.latitude, geo.longitude, geo.accuracy ?? 9999)
+  }, [geo.latitude, geo.longitude, geo.accuracy, agent])
 
   // Auto-scroll history
   useEffect(() => {
@@ -242,9 +272,20 @@ export function App() {
           className="chat-area"
           style={{ cursor: msgs.length > 1 ? 'pointer' : 'default' }}
           onClick={(e) => { e.stopPropagation(); if (msgs.length > 1) setHistoryOpen(true) }}
+          onWheel={() => { if (msgs.length > 1 && !historyOpen) setHistoryOpen(true) }}
+          onTouchMove={() => { if (msgs.length > 1 && !historyOpen) setHistoryOpen(true) }}
         >
           {historyOpen ? (
             <div className="history-overlay" onClick={(e) => e.stopPropagation()}>
+              <div className="history-overlay-header">
+                <span className="history-overlay-title">Conversation</span>
+                <button className="history-overlay-close" onClick={() => setHistoryOpen(false)}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                  Back
+                </button>
+              </div>
               <div className="history-scroll" ref={historyScrollRef}>
                 {msgs.map(msg => (
                   <div key={msg.id} className={`msg-row${msg.role === 'user' ? ' msg-row--user' : ''}${msg.id === newestAgentMsgId ? ' msg-row--new' : ''}`}>
@@ -371,7 +412,7 @@ export function App() {
                 <circle cx="12" cy="10" r="3" />
                 <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 14 8 14s8-8.75 8-14a8 8 0 0 0-8-8z" />
               </svg>
-              {agent.mapAction && (agent.mapAction.type === 'show_directions' || agent.mapAction.type === 'show_route') && (
+              {agent.mapAction && (agent.mapAction.type === 'show_directions' || agent.mapAction.type === 'show_route' || agent.mapAction.type === 'show_trajectory') && (
                 <span className="nav-map-pulse" aria-hidden="true">
                   <span className="nav-map-pulse__ring" />
                   <span className="nav-map-pulse__ring" />
@@ -388,12 +429,17 @@ export function App() {
           <div className={`map-sheet${mapSheetClosing ? ' map-sheet--collapsing' : ''}`} onClick={(e) => e.stopPropagation()}>
             <div className="sheet-handle" />
             {agent.mapAction ? (
-              <MapDirectionsPanel
-                action={agent.mapAction}
-                userLat={geo.latitude ?? undefined}
-                userLng={geo.longitude ?? undefined}
-                onDismiss={closeMapSheet}
-              />
+              <>
+                <MapDirectionsPanel
+                  action={agent.mapAction}
+                  userLat={geo.latitude ?? undefined}
+                  userLng={geo.longitude ?? undefined}
+                  onDismiss={closeMapSheet}
+                />
+                {agent.checkpointPrompt && (
+                  <CheckpointConfirmButton prompt={agent.checkpointPrompt} onConfirm={agent.confirmCheckpoint} />
+                )}
+              </>
             ) : mapsUrl ? (
               <div className="maps-frame-wrap">
                 <iframe

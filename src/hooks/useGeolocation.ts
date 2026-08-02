@@ -10,6 +10,7 @@ export function useGeolocation(): GeolocationHook {
   const [state, setState] = useState<GeolocationState>({
     latitude: null,
     longitude: null,
+    accuracy: null,
     error: null,
     permission: 'unknown',
     loading: false,
@@ -39,6 +40,7 @@ export function useGeolocation(): GeolocationHook {
         setState({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
           error: null,
           permission: 'granted',
           loading: false,

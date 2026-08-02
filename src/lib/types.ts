@@ -26,6 +26,7 @@ export interface VoiceAgentConfig {
 export interface GeolocationState {
   latitude: number | null
   longitude: number | null
+  accuracy: number | null
   error: string | null
   permission: 'granted' | 'denied' | 'prompt' | 'unknown'
   loading: boolean
@@ -37,11 +38,55 @@ export interface MapDestination {
   lng: number
 }
 
+// POI type as reported by the backend's map_engine _TYPE_PRIORITY table —
+// left as `string` rather than a closed union since the map data drives it.
+export type PoiKind = string
+
+export interface TrajectoryStop {
+  id: string
+  name: string
+  lat: number
+  lng: number
+  kind: PoiKind
+  isPortal: boolean // true for the elevator/escalator/stairs used to leave this floor
+}
+
+export interface TrajectorySegment {
+  levelName: string
+  stops: TrajectoryStop[]       // in travel order; last stop is portalOut (if not the final segment)
+  portalOut: TrajectoryStop | null
+}
+
+export interface TrajectoryPayload {
+  type: 'show_trajectory'
+  routeId: string
+  origin: MapDestination
+  destination: MapDestination
+  segments: TrajectorySegment[]
+  activeSegmentIndex: number
+  etaMinutes: number | null
+}
+
 export type MapActionPayload =
   | { type: 'show_destination'; destination: MapDestination }
   | { type: 'show_directions'; destination: MapDestination; origin?: { lat: number; lng: number } }
   | { type: 'show_route'; stops: MapDestination[] }
+  | TrajectoryPayload
   | { type: 'clear' }
+
+export interface CheckpointPrompt {
+  routeId: string
+  segmentIndex: number
+  poiName: string
+  promptText: string
+  gpsTarget: { lat: number; lng: number } | null
+}
+
+export interface CheckpointResolved {
+  routeId: string
+  segmentIndex: number
+  nextSegmentIndex: number
+}
 
 // WebSocket message types — inbound from server
 export type ServerMessage =
@@ -51,6 +96,8 @@ export type ServerMessage =
   | { type: 'status'; state: AgentState; label?: string }
   | { type: 'error'; message: string }
   | { type: 'map_action'; action: MapActionPayload }
+  | ({ type: 'checkpoint_prompt' } & CheckpointPrompt)
+  | ({ type: 'checkpoint_resolved' } & CheckpointResolved)
 
 // WebSocket message types — outbound to server
 export type ClientMessage =
@@ -61,3 +108,5 @@ export type ClientMessage =
   | { type: 'text'; text: string; language: string }
   | { type: 'config'; language: string; userId?: string }
   | { type: 'ping' }
+  | { type: 'location'; lat: number; lng: number; accuracy: number; timestamp: number }
+  | { type: 'checkpoint_ack'; routeId: string; segmentIndex: number; poiName: string }
