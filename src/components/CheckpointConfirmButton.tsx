@@ -2,6 +2,7 @@ import type { CheckpointPrompt } from '../lib/types'
 
 interface Props {
   prompt: CheckpointPrompt
+  visible: boolean
   onConfirm: () => void
   onNeedHelp: () => void
 }
@@ -12,9 +13,14 @@ interface Props {
 // its GPS sanity-check, decides whether to actually advance). "Need help"
 // doesn't advance anything — it just tells the agent the user is stuck so
 // it can give more detail without losing their place.
-export function CheckpointConfirmButton({ prompt, onConfirm, onNeedHelp }: Props) {
+//
+// `visible` gates a slow opacity fade rather than the row's mount/unmount —
+// the row mounts as soon as the checkpoint arrives (so its layout space is
+// reserved) but stays invisible until the caller flips `visible` once the
+// agent has actually finished speaking about it.
+export function CheckpointConfirmButton({ prompt, visible, onConfirm, onNeedHelp }: Props) {
   return (
-    <div className="checkpoint-pill-row">
+    <div className={`checkpoint-pill-row${visible ? ' checkpoint-pill-row--visible' : ''}`}>
       <button className="checkpoint-pill checkpoint-pill--confirm" onClick={onConfirm}>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <polyline points="20 6 9 17 4 12" />

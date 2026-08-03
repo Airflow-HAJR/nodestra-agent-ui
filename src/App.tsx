@@ -96,6 +96,33 @@ export function App() {
     mapAutoCloseTimerRef.current = setTimeout(collapseMapSheet, MAP_AUTO_CLOSE_MS)
   }, [agent.mapAction, agent.agentState, clearMapTimers, collapseMapSheet])
 
+  // Same idea as the map reveal above, but held back even longer: the
+  // checkpoint pills fade in only once the agent has actually finished
+  // speaking about the checkpoint (agentState settles back to idle/
+  // listening/error), not the instant the prompt arrives or even once
+  // speech starts — so they show up right as (or just after) the agent
+  // says something like "...or tap the button." revealedCheckpointKeyRef
+  // dedupes so a checkpoint that's already visible doesn't reset/re-fade
+  // just because agentState fluctuates afterward (e.g. user starts talking).
+  const [checkpointVisible, setCheckpointVisible] = useState(false)
+  const revealedCheckpointKeyRef = useRef<string | null>(null)
+  useEffect(() => {
+    const prompt = agent.checkpointPrompt
+    if (!prompt) {
+      setCheckpointVisible(false)
+      revealedCheckpointKeyRef.current = null
+      return
+    }
+    const key = `${prompt.routeId}:${prompt.segmentIndex}:${prompt.stopIndex}`
+    if (revealedCheckpointKeyRef.current === key) return
+    if (agent.agentState === 'thinking' || agent.agentState === 'speaking') {
+      setCheckpointVisible(false)
+      return
+    }
+    revealedCheckpointKeyRef.current = key
+    setCheckpointVisible(true)
+  }, [agent.checkpointPrompt, agent.agentState])
+
   useEffect(() => clearMapTimers, [clearMapTimers])
 
   // Stream live GPS to the backend, throttled — at most once every 4s, or
@@ -343,6 +370,7 @@ export function App() {
       {agent.checkpointPrompt && (
         <CheckpointConfirmButton
           prompt={agent.checkpointPrompt}
+          visible={checkpointVisible}
           onConfirm={agent.confirmCheckpoint}
           onNeedHelp={agent.requestCheckpointHelp}
         />
