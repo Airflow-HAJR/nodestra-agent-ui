@@ -512,10 +512,11 @@ body {
 .map-directions-dismiss:hover { background: rgba(255,255,255,0.35); }
 
 .checkpoint-pill-row {
+  flex-shrink: 0;
   display: flex;
   gap: 8px;
-  width: calc(100% - 24px);
-  margin: 12px auto 4px;
+  padding: 0 20px 6px;
+  animation: msg-in 0.22s cubic-bezier(0.22,1,0.36,1) both;
 }
 
 .checkpoint-pill {

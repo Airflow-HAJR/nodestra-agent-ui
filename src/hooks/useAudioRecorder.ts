@@ -3,7 +3,7 @@ import { getSupportedMimeType } from '../lib/constants'
 
 const SILENCE_THRESHOLD = 0.04   // RMS level below this = silence
 const SPEECH_THRESHOLD  = 0.08   // RMS level above this = speech detected
-const SILENCE_DELAY_MS  = 2000   // ms of silence before auto-stop — generous enough to survive natural mid-sentence pauses
+const SILENCE_DELAY_MS  = 2300   // ms of silence before auto-stop — generous enough to survive natural mid-sentence pauses
 const MIN_SPEECH_MS     = 400    // must detect speech for this long before VAD can trigger
 const PRE_ROLL_RECYCLE_MS = 1500 // recycle the idle pre-roll recorder this often so it never accumulates more than this much lead-in
 

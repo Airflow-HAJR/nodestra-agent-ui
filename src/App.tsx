@@ -339,6 +339,15 @@ export function App() {
         </div>
       </div>
 
+      {/* ── Checkpoint confirmation pills (main section, above bottom bar) ── */}
+      {agent.checkpointPrompt && (
+        <CheckpointConfirmButton
+          prompt={agent.checkpointPrompt}
+          onConfirm={agent.confirmCheckpoint}
+          onNeedHelp={agent.requestCheckpointHelp}
+        />
+      )}
+
       {/* ── Bottom bar: keyboard toggle + mute ── */}
       <div className="bottom-bar">
         {textOpen ? (
@@ -429,21 +438,12 @@ export function App() {
           <div className={`map-sheet${mapSheetClosing ? ' map-sheet--collapsing' : ''}`} onClick={(e) => e.stopPropagation()}>
             <div className="sheet-handle" />
             {agent.mapAction ? (
-              <>
-                <MapDirectionsPanel
-                  action={agent.mapAction}
-                  userLat={geo.latitude ?? undefined}
-                  userLng={geo.longitude ?? undefined}
-                  onDismiss={closeMapSheet}
-                />
-                {agent.checkpointPrompt && (
-                  <CheckpointConfirmButton
-                    prompt={agent.checkpointPrompt}
-                    onConfirm={agent.confirmCheckpoint}
-                    onNeedHelp={agent.requestCheckpointHelp}
-                  />
-                )}
-              </>
+              <MapDirectionsPanel
+                action={agent.mapAction}
+                userLat={geo.latitude ?? undefined}
+                userLng={geo.longitude ?? undefined}
+                onDismiss={closeMapSheet}
+              />
             ) : mapsUrl ? (
               <div className="maps-frame-wrap">
                 <iframe
