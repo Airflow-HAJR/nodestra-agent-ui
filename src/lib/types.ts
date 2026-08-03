@@ -113,5 +113,3 @@ export type ClientMessage =
   | { type: 'config'; language: string; userId?: string }
   | { type: 'ping' }
   | { type: 'location'; lat: number; lng: number; accuracy: number; timestamp: number }
-  | { type: 'checkpoint_ack'; routeId: string; segmentIndex: number; stopIndex: number; poiName: string }
-  | { type: 'checkpoint_help'; routeId: string; segmentIndex: number; stopIndex: number; poiName: string }

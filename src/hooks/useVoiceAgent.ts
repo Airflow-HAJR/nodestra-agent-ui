@@ -646,46 +646,30 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
     wsRef.current.send(JSON.stringify({ type: 'location', lat, lng, accuracy, timestamp: Date.now() }))
   }, [])
 
-  // Tapping the on-screen checkpoint button — the server turns this into a
-  // synthetic user turn, so the same LLM judgment (incl. GPS sanity-check)
-  // that governs a spoken "I'm at the elevator" governs this too.
+  // Tapping either checkpoint pill behaves exactly like the user having said
+  // it out loud: cut the agent off if it's mid-sentence, play the same
+  // listening-start chime a real utterance would, and send it as a normal
+  // text turn (shows up in the transcript, goes through the same LLM
+  // judgment as speech) — no special "synthetic turn" plumbing that the
+  // model has to interpret differently from a real message.
   const confirmCheckpoint = useCallback(() => {
     const prompt = checkpointPrompt
     if (!prompt) return
     setCheckpointPrompt(null)
-    setAgentState('thinking')
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({
-        type: 'checkpoint_ack',
-        routeId: prompt.routeId,
-        segmentIndex: prompt.segmentIndex,
-        stopIndex: prompt.stopIndex,
-        poiName: prompt.poiName,
-      }))
-    } else {
-      setAgentState('idle')
-    }
-  }, [checkpointPrompt])
+    if (agentStateRef.current === 'speaking') interrupt()
+    playSound(LISTENING_START_SOUND_URL)
+    sendText(`Made it to ${prompt.poiName}.`)
+  }, [checkpointPrompt, interrupt, playSound, sendText])
 
-  // Tapping "Need help" — doesn't advance or clear anything, just tells the
-  // agent (as a synthetic turn) that the user is stuck at the current
-  // checkpoint so it can give more detail without losing their place.
+  // "Need help" doesn't clear the pending checkpoint (the user hasn't
+  // resolved it) — otherwise behaves the same as confirmCheckpoint.
   const requestCheckpointHelp = useCallback(() => {
     const prompt = checkpointPrompt
     if (!prompt) return
-    setAgentState('thinking')
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({
-        type: 'checkpoint_help',
-        routeId: prompt.routeId,
-        segmentIndex: prompt.segmentIndex,
-        stopIndex: prompt.stopIndex,
-        poiName: prompt.poiName,
-      }))
-    } else {
-      setAgentState('idle')
-    }
-  }, [checkpointPrompt])
+    if (agentStateRef.current === 'speaking') interrupt()
+    playSound(LISTENING_START_SOUND_URL)
+    sendText(`I need help finding ${prompt.poiName}.`)
+  }, [checkpointPrompt, interrupt, playSound, sendText])
 
   return {
     agentState, connectionState, messages,
