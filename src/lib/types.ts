@@ -49,6 +49,7 @@ export interface TrajectoryStop {
   lng: number
   kind: PoiKind
   isPortal: boolean // true for the elevator/escalator/stairs used to leave this floor
+  index: number      // stable position within the segment's stop list — the number shown on the map marker
 }
 
 export interface TrajectorySegment {
@@ -64,6 +65,7 @@ export interface TrajectoryPayload {
   destination: MapDestination
   segments: TrajectorySegment[]
   activeSegmentIndex: number
+  activeStopIndex: number // index (within the active segment) of the stop the user is currently heading to — highlighted distinctly
   etaMinutes: number | null
 }
 
@@ -112,3 +114,4 @@ export type ClientMessage =
   | { type: 'ping' }
   | { type: 'location'; lat: number; lng: number; accuracy: number; timestamp: number }
   | { type: 'checkpoint_ack'; routeId: string; segmentIndex: number; stopIndex: number; poiName: string }
+  | { type: 'checkpoint_help'; routeId: string; segmentIndex: number; stopIndex: number; poiName: string }

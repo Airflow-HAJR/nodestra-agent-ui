@@ -15,6 +15,7 @@ const ORIGIN_COLOR = '#4285F4'
 const DESTINATION_COLOR = '#EA4335'
 const WAYPOINT_COLOR = '#34A853'
 const PORTAL_COLOR = '#FBBC05' // elevator/escalator/stairs — the checkpoint the user is heading to on this floor
+const ACTIVE_COLOR = '#9C27B0' // the specific stop the user is currently being guided to — always wins over other colors
 
 // Renders markers + a manually-drawn polyline on a real Google Maps JS
 // instance. We do NOT use the Embed API's `directions` mode here — Google's
@@ -51,20 +52,20 @@ function MapCanvas({ action, userLat, userLng }: { action: MapActionPayload; use
 
       const bounds = new google.maps.LatLngBounds()
 
-      const addMarker = (pos: { lat: number; lng: number }, label: string, color: string) => {
+      const addMarker = (pos: { lat: number; lng: number }, label: string, color: string, active?: boolean) => {
         const marker = new google.maps.Marker({
           position: pos,
           map,
-          label: label ? { text: label, color: '#fff', fontSize: '11px', fontWeight: '700' } : undefined,
+          label: label ? { text: label, color: '#fff', fontSize: active ? '13px' : '11px', fontWeight: '700' } : undefined,
           icon: {
             path: google.maps.SymbolPath.CIRCLE,
-            scale: 10,
+            scale: active ? 14 : 10,
             fillColor: color,
             fillOpacity: 1,
             strokeColor: '#fff',
-            strokeWeight: 2,
+            strokeWeight: active ? 3 : 2,
           },
-          zIndex: color === DESTINATION_COLOR ? 10 : 5,
+          zIndex: active ? 20 : color === DESTINATION_COLOR ? 10 : 5,
         })
         overlaysRef.current.push(marker)
         bounds.extend(pos)
@@ -114,21 +115,26 @@ function MapCanvas({ action, userLat, userLng }: { action: MapActionPayload; use
 
       if (action.type === 'show_trajectory') {
         // Only the active floor's leg is drawn — later floors aren't
-        // reachable yet, so showing them would just be confusing. The
-        // final red destination pin only appears once we're on the last
-        // segment; earlier floors end at the portal (elevator/escalator/
-        // stairs) the user needs to take next, highlighted in amber.
+        // reachable yet, so showing them would just be confusing. Every
+        // stop keeps a stable number (its position in the full route, not
+        // just what's currently visible) so the agent can say "stop 3" and
+        // it always matches this label. The final red destination pin only
+        // appears once we're on the last segment; a floor-changing portal
+        // is amber; and whichever stop the user is being guided to RIGHT
+        // NOW is highlighted in purple regardless of its other role.
         const seg = action.segments[action.activeSegmentIndex] ?? action.segments[0]
         if (seg && seg.stops.length > 0) {
           const isFinalSegment = action.activeSegmentIndex === action.segments.length - 1
           seg.stops.forEach((stop, i) => {
             const isFirst = i === 0
             const isLastOfSegment = i === seg.stops.length - 1
+            const isActive = stop.index === action.activeStopIndex
             let color: string = WAYPOINT_COLOR
             if (isFirst) color = ORIGIN_COLOR
             else if (isLastOfSegment && isFinalSegment) color = DESTINATION_COLOR
             else if (stop.isPortal) color = PORTAL_COLOR
-            addMarker(stop, stop.isPortal ? '↑' : String(i + 1), color)
+            if (isActive) color = ACTIVE_COLOR
+            addMarker(stop, String(stop.index + 1), color, isActive)
           })
           drawRoute(seg.stops)
           map.fitBounds(bounds, 48)

@@ -437,7 +437,11 @@ export function App() {
                   onDismiss={closeMapSheet}
                 />
                 {agent.checkpointPrompt && (
-                  <CheckpointConfirmButton prompt={agent.checkpointPrompt} onConfirm={agent.confirmCheckpoint} />
+                  <CheckpointConfirmButton
+                    prompt={agent.checkpointPrompt}
+                    onConfirm={agent.confirmCheckpoint}
+                    onNeedHelp={agent.requestCheckpointHelp}
+                  />
                 )}
               </>
             ) : mapsUrl ? (

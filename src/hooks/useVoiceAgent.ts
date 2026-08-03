@@ -55,6 +55,7 @@ export interface VoiceAgentHook {
   unlockAudio: () => void
   sendLocation: (lat: number, lng: number, accuracy: number) => void
   confirmCheckpoint: () => void
+  requestCheckpointHelp: () => void
 }
 
 export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
@@ -666,6 +667,26 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
     }
   }, [checkpointPrompt])
 
+  // Tapping "Need help" — doesn't advance or clear anything, just tells the
+  // agent (as a synthetic turn) that the user is stuck at the current
+  // checkpoint so it can give more detail without losing their place.
+  const requestCheckpointHelp = useCallback(() => {
+    const prompt = checkpointPrompt
+    if (!prompt) return
+    setAgentState('thinking')
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'checkpoint_help',
+        routeId: prompt.routeId,
+        segmentIndex: prompt.segmentIndex,
+        stopIndex: prompt.stopIndex,
+        poiName: prompt.poiName,
+      }))
+    } else {
+      setAgentState('idle')
+    }
+  }, [checkpointPrompt])
+
   return {
     agentState, connectionState, messages,
     isConnected: connectionState === 'connected',
@@ -675,7 +696,7 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
     micError: recorder.error,
     streamingText, isStreaming, partialTranscript, thinkingLabel,
     mapAction, clearMapAction,
-    checkpointPrompt, confirmCheckpoint,
+    checkpointPrompt, confirmCheckpoint, requestCheckpointHelp,
     muted, toggleMute, interrupt, sendText,
     startListening, stopListening, clearMessages, unlockAudio,
     sendLocation,
