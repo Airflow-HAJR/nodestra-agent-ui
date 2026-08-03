@@ -533,6 +533,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 6px;
+  min-width: 0;
   padding: 11px 12px;
   border: none;
   border-radius: 999px;
@@ -540,12 +541,23 @@ body {
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.15s;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .checkpoint-pill:hover { opacity: 0.9; }
 .checkpoint-pill:active { opacity: 0.75; }
+
+/* "Made it to" never shrinks or truncates — only the POI name does, so a
+   long location name never eats into the part of the label that explains
+   what tapping the button does. */
+.checkpoint-pill__prefix {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.checkpoint-pill__poi {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .checkpoint-pill--confirm {
   background: var(--accent, #4285F4);

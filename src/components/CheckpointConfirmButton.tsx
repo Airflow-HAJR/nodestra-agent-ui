@@ -21,11 +21,16 @@ interface Props {
 export function CheckpointConfirmButton({ prompt, visible, onConfirm, onNeedHelp }: Props) {
   return (
     <div className={`checkpoint-pill-row${visible ? ' checkpoint-pill-row--visible' : ''}`}>
-      <button className="checkpoint-pill checkpoint-pill--confirm" onClick={onConfirm}>
+      <button
+        className="checkpoint-pill checkpoint-pill--confirm"
+        onClick={onConfirm}
+        title={`Made it to ${prompt.poiName}`}
+      >
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <polyline points="20 6 9 17 4 12" />
         </svg>
-        Made it to {prompt.poiName}
+        <span className="checkpoint-pill__prefix">Made it to</span>
+        <span className="checkpoint-pill__poi">{prompt.poiName}</span>
       </button>
       <button className="checkpoint-pill checkpoint-pill--help" onClick={onNeedHelp}>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
