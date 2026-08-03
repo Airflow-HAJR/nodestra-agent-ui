@@ -10,6 +10,13 @@
   --text-muted:  #AAAAAA;
   --border:      #EBEBEB;
   --surface:     #F5F5F5;
+  /* Orb diameter. Keep in sync with useOrbSize() in AgentOrb.tsx. */
+  --orb-size:    min(72.5vw, 266px);
+  /* Fixed gap between the top of the center stage and the orb, and between
+     the orb and the first line of caption text. Both are constants so the
+     orb and the caption's top edge never move as text length changes. */
+  --orb-top:     26px;
+  --orb-gap:     20px;
   --safe-top:    env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -126,6 +133,12 @@ body {
   max-height: 190px;
   position: relative;
   overflow: hidden;
+}
+
+/* Reserves the chat area's space before any message exists, so the orb
+   below it doesn't jump down-to-up when the first message lands. */
+.chat-area--empty {
+  pointer-events: none;
 }
 
 /* Gradient mask: top fully transparent → bottom fully visible */
@@ -260,15 +273,18 @@ body {
 }
 
 /* ─── Center stage: the orb ──────────────────────────────────── */
+/* The orb is pinned to a constant offset from the top of the stage (not
+   vertically centered) and the caption is taken out of the flow entirely,
+   so neither one shifts when the caption grows or shrinks. */
 .center-stage {
   flex: 1;
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 22px;
+  justify-content: flex-start;
   min-height: 0;
-  padding: 12px 0;
+  padding: var(--orb-top) 0 0;
 }
 
 /* orb-ui.com's "cloud" theme (npm package `orb-ui`), driven in controlled
@@ -276,8 +292,8 @@ body {
 
 .orb-container {
   position: relative;
-  width: min(58vw, 213px);
-  height: min(58vw, 213px);
+  width: var(--orb-size);
+  height: var(--orb-size);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -314,12 +330,22 @@ body {
   opacity: 1 !important;
 }
 
+/* Absolutely positioned so the caption's top edge is always exactly
+   --orb-gap below the orb's bottom edge, and extra lines extend downward
+   without pushing the orb (or the first line) anywhere. */
 .orb-status {
-  min-height: 24px;
+  position: absolute;
+  top: calc(var(--orb-top) + var(--orb-size) + var(--orb-gap));
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   padding: 0 24px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .status-caption {
   font-size: 14px;

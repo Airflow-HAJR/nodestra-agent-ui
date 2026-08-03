@@ -293,8 +293,13 @@ export function App() {
         </div>
       </header>
 
-      {/* ── Conversation history (kept, minimized) ── */}
-      {msgs.length > 0 && (
+      {/* ── Conversation history (kept, minimized) ──
+          Rendered even when empty (as an invisible spacer) so the center
+          stage below never changes height — that's what keeps the orb at a
+          fixed screen position from the very first message onward. */}
+      {msgs.length === 0 ? (
+        <div className="chat-area chat-area--empty" aria-hidden="true" />
+      ) : (
         <div
           className="chat-area"
           style={{ cursor: msgs.length > 1 ? 'pointer' : 'default' }}

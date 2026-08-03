@@ -10,7 +10,8 @@ interface AgentOrbProps {
 }
 
 function useOrbSize() {
-  const compute = () => Math.min(window.innerWidth * 0.58, 213)
+  // Keep in sync with --orb-size in index.css (0.58vw/213px, +25%).
+  const compute = () => Math.min(window.innerWidth * 0.725, 266)
   const [size, setSize] = useState(compute)
 
   useEffect(() => {
