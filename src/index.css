@@ -391,8 +391,8 @@ body {
 .orb-status-scroll::-webkit-scrollbar { display: none; }
 
 /* When text runs past the box, ramp the last ~40px toward (but not all the
-   way to) transparent, so the clipped line stays faintly legible under the
-   blur veil instead of vanishing at a hard edge. */
+   way to) transparent, so the clipped line fades out instead of ending at a
+   hard edge. */
 .orb-status--more .orb-status-scroll {
   -webkit-mask-image: linear-gradient(
     to bottom,
@@ -407,25 +407,6 @@ body {
     rgba(0, 0, 0, 0.28) 100%
   );
 }
-
-/* The blur half of the same effect: a strip at the bottom of the box whose
-   blur ramps up toward the floor. Hidden unless there's overflow, so a
-   caption that fits is never softened. */
-.orb-status-more-veil {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 42px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.35s ease;
-  backdrop-filter: blur(3.5px);
-  -webkit-backdrop-filter: blur(3.5px);
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 85%);
-  mask-image: linear-gradient(to bottom, transparent 0, #000 85%);
-}
-.orb-status--more .orb-status-more-veil { opacity: 1; }
 .status-caption {
   font-size: 14px;
   color: var(--text-muted);
