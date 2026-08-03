@@ -22,10 +22,13 @@
   /* Constant gap between the orb's bottom edge and the caption's first
      line, so the caption's top never moves as its text grows. */
   --orb-gap:     18px;
-  --caption-line: 22px;            /* 15px font x 1.5 line-height */
   /* Height of the bottom bar (44px button + 10px/20px padding), used as the
      caption's floor so long text never runs under the nav buttons. */
   --bottom-bar-h: calc(var(--safe-bottom) + 74px);
+  --pill-row-h:  50px;             /* checkpoint pill row, when present */
+  /* Where the caption has to stop. Raised while the checkpoint pills are up
+     so agent text can never run underneath them. */
+  --caption-floor: calc(var(--bottom-bar-h) + 10px);
   --safe-top:    env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -150,6 +153,11 @@ body {
   min-height: 110px;
   max-height: 160px;
   position: relative;
+  /* Opaque and above the screen-anchored orb, so if the orb's top edge ever
+     reaches this far up on an unusually short viewport it slides under the
+     history rather than through it. */
+  z-index: 2;
+  background: #fff;
   overflow: hidden;
 }
 
@@ -361,10 +369,16 @@ body {
   top: calc(50% + var(--orb-size) / 2 + var(--orb-gap));
   left: 0;
   right: 0;
-  bottom: var(--bottom-bar-h);
-  /* Floor of 4 lines: on a viewport too short for that, the caption is
-     allowed to reach down toward the nav buttons rather than clip to 2. */
-  min-height: calc(4 * var(--caption-line));
+  /* Hard floor. Deliberately no min-height — a min-height would win over
+     top/bottom and let the box grow back down over the checkpoint pills. The
+     4-line guarantee comes from the --orb-size cap keeping this box tall
+     enough, not from forcing a height here. */
+  bottom: var(--caption-floor);
+  overflow: hidden;
+}
+
+.orb-status-scroll {
+  height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -372,7 +386,46 @@ body {
   padding: 0 24px;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-width: none;
 }
+.orb-status-scroll::-webkit-scrollbar { display: none; }
+
+/* When text runs past the box, ramp the last ~40px toward (but not all the
+   way to) transparent, so the clipped line stays faintly legible under the
+   blur veil instead of vanishing at a hard edge. */
+.orb-status--more .orb-status-scroll {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 0,
+    #000 calc(100% - 40px),
+    rgba(0, 0, 0, 0.28) 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    #000 0,
+    #000 calc(100% - 40px),
+    rgba(0, 0, 0, 0.28) 100%
+  );
+}
+
+/* The blur half of the same effect: a strip at the bottom of the box whose
+   blur ramps up toward the floor. Hidden unless there's overflow, so a
+   caption that fits is never softened. */
+.orb-status-more-veil {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 42px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+  backdrop-filter: blur(3.5px);
+  -webkit-backdrop-filter: blur(3.5px);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 85%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 85%);
+}
+.orb-status--more .orb-status-more-veil { opacity: 1; }
 .status-caption {
   font-size: 14px;
   color: var(--text-muted);
@@ -389,9 +442,11 @@ body {
 
 /* While the checkpoint pills are up they occupy the strip just above the
    bottom bar, so pull the caption's floor above them. Only the floor moves —
-   the top edge stays pinned under the orb. */
-.app--checkpoint .orb-status {
-  bottom: calc(var(--bottom-bar-h) + 52px);
+   the top edge stays pinned under the orb. Set on .app (not on .orb-status)
+   so the caption box, its mask and its blur veil all pick up the new floor
+   together. */
+.app--checkpoint {
+  --caption-floor: calc(var(--bottom-bar-h) + var(--pill-row-h) + 10px);
 }
 .speaking-cursor {
   display: inline-block;
@@ -411,6 +466,9 @@ body {
   justify-content: center;
   gap: 22px;
   padding: 10px 20px calc(var(--safe-bottom) + 20px);
+  position: relative;
+  z-index: 2;
+  background: #fff;
 }
 
 .bottom-icon-btn {
@@ -575,6 +633,12 @@ body {
   display: flex;
   gap: 8px;
   padding: 0 20px 6px;
+  /* Opaque, and above the caption in the stacking order: a second line of
+     defense so agent text can never be seen through the pills even if the
+     caption floor is ever mis-measured. */
+  position: relative;
+  z-index: 2;
+  background: #fff;
   opacity: 0;
   transform: translateY(4px);
   pointer-events: none;

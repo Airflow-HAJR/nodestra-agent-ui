@@ -247,6 +247,27 @@ export function App() {
 
   const typedPartialTranscript = useTypewriter(agent.partialTranscript, 22)
 
+  // The caption box has a fixed top edge (pinned under the orb) and a fixed
+  // floor (above the pills / nav bar), so text past that floor is clipped.
+  // Watch for that and let the CSS blur-and-fade the overflowing lines rather
+  // than cutting them off flat, which read as "that's all the agent said".
+  const captionRef = useRef<HTMLDivElement>(null)
+  const [captionOverflows, setCaptionOverflows] = useState(false)
+  const measureCaption = useCallback(() => {
+    const el = captionRef.current
+    // Identical state is a no-op in React, so this is safe to call freely.
+    setCaptionOverflows(!!el && el.scrollHeight - el.clientHeight > 1)
+  }, [])
+  // No dep array: the caption's inner element is swapped out entirely when the
+  // agent moves between speaking / partial / status, so there's no stable node
+  // to observe — re-measuring per render (streaming re-renders anyway) is both
+  // simpler and always correct.
+  useEffect(measureCaption)
+  useEffect(() => {
+    window.addEventListener('resize', measureCaption)
+    return () => window.removeEventListener('resize', measureCaption)
+  }, [measureCaption])
+
   // Keep the user's last-heard words on screen for a couple seconds after
   // silence is detected, instead of snapping straight to "Thinking…".
   const [heldTranscript, setHeldTranscript] = useState('')
@@ -357,20 +378,25 @@ export function App() {
           muted={agent.muted}
           onInterrupt={agent.interrupt}
         />
-        <div className="orb-status">
-          {isSpeaking ? (
-            <div className="speaking-caption">
-              {agent.streamingText}
-              {agent.isStreaming && <span className="speaking-cursor" />}
-            </div>
-          ) : heldTranscript ? (
-            <div className="partial-caption">
-              {heldTranscript}
-              {isListening && <span className="speaking-cursor" />}
-            </div>
-          ) : statusCaption ? (
-            <div className="status-caption">{statusCaption}</div>
-          ) : null}
+        <div className={`orb-status${captionOverflows ? ' orb-status--more' : ''}`}>
+          <div className="orb-status-scroll" ref={captionRef}>
+            {isSpeaking ? (
+              <div className="speaking-caption">
+                {agent.streamingText}
+                {agent.isStreaming && <span className="speaking-cursor" />}
+              </div>
+            ) : heldTranscript ? (
+              <div className="partial-caption">
+                {heldTranscript}
+                {isListening && <span className="speaking-cursor" />}
+              </div>
+            ) : statusCaption ? (
+              <div className="status-caption">{statusCaption}</div>
+            ) : null}
+          </div>
+          {/* Blurs and fades whatever sits past the visible box, so it's
+              obvious the agent said more than fits. */}
+          <div className="orb-status-more-veil" aria-hidden="true" />
         </div>
       </div>
 
