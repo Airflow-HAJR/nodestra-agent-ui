@@ -274,7 +274,10 @@ export function App() {
     : null
 
   return (
-    <div className="app" onClick={ensureAudioUnlocked}>
+    <div
+      className={`app${agent.checkpointPrompt ? ' app--checkpoint' : ''}`}
+      onClick={ensureAudioUnlocked}
+    >
 
       {/* ── Header ── */}
       <header className="app-header">

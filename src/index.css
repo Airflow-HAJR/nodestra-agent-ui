@@ -10,13 +10,22 @@
   --text-muted:  #AAAAAA;
   --border:      #EBEBEB;
   --surface:     #F5F5F5;
-  /* Orb diameter. Keep in sync with useOrbSize() in AgentOrb.tsx. */
-  --orb-size:    min(72.5vw, 266px);
-  /* Fixed gap between the top of the center stage and the orb, and between
-     the orb and the first line of caption text. Both are constants so the
-     orb and the caption's top edge never move as text length changes. */
-  --orb-top:     26px;
-  --orb-gap:     20px;
+  /* Orb diameter. Keep in sync with useOrbSize() in AgentOrb.tsx. The 32vh
+     cap is what guarantees the caption below still gets its 4+ lines on a
+     short viewport (mobile Safari with the URL bar showing) instead of the
+     orb eating the whole screen. */
+  --orb-size:    min(72.5vw, 266px, 32vh);
+  /* svh (the viewport with the browser bars showing) is what window.innerHeight
+     actually reports for this never-scrolling layout, so the CSS box and the
+     WebGL canvas agree. vh above is the fallback for older browsers. */
+  --orb-size:    min(72.5vw, 266px, 32svh);
+  /* Constant gap between the orb's bottom edge and the caption's first
+     line, so the caption's top never moves as its text grows. */
+  --orb-gap:     18px;
+  --caption-line: 22px;            /* 15px font x 1.5 line-height */
+  /* Height of the bottom bar (44px button + 10px/20px padding), used as the
+     caption's floor so long text never runs under the nav buttons. */
+  --bottom-bar-h: calc(var(--safe-bottom) + 74px);
   --safe-top:    env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -39,8 +48,8 @@ body {
 }
 
 #root {
-  height: 100dvh;
   height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -68,10 +77,15 @@ body {
 .app {
   display: flex;
   flex-direction: column;
-  height: 100dvh;
+  /* vh first as the fallback, dvh last so it wins where supported — the
+     other order meant mobile Safari used the *large* viewport and pushed the
+     bottom of the stage below the visible area. */
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   background: #fff;
+  /* Positioning context for the screen-centered orb and its caption. */
+  position: relative;
 }
 
 /* ─── Header ────────────────────────────────────────────────── */
@@ -128,9 +142,13 @@ body {
 /* ─── Chat area (conversation history) ───────────────────────── */
 .chat-area {
   flex-shrink: 0;
-  height: 22vh;
-  min-height: 130px;
-  max-height: 190px;
+  /* Trimmed from 22vh/130-190px: the orb is now screen-centered and 25%
+     bigger, and a taller history preview would collide with its top edge on
+     shorter viewports. It still holds the two-message preview comfortably
+     (~40px per row). */
+  height: 18vh;
+  min-height: 110px;
+  max-height: 160px;
   position: relative;
   overflow: hidden;
 }
@@ -273,25 +291,29 @@ body {
 }
 
 /* ─── Center stage: the orb ──────────────────────────────────── */
-/* The orb is pinned to a constant offset from the top of the stage (not
-   vertically centered) and the caption is taken out of the flow entirely,
-   so neither one shifts when the caption grows or shrinks. */
+/* Nothing but a flex spacer that holds the bottom bar down. The orb and the
+   caption inside it are positioned against `.app` (the full screen), not
+   against this box — deliberately NOT `position: relative` here, so the orb
+   is centered on the whole screen rather than in the gap between the history
+   box and the nav buttons, and neither element moves when the caption's
+   length changes. */
 .center-stage {
   flex: 1;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
   min-height: 0;
-  padding: var(--orb-top) 0 0;
 }
 
 /* orb-ui.com's "cloud" theme (npm package `orb-ui`), driven in controlled
    mode by our own AgentState. */
 
 .orb-container {
-  position: relative;
+  /* Centered on the screen: absolute against `.app`, horizontally centred
+     with auto margins rather than translateX so it never fights the
+     `scale()` transform the speaking pulse writes inline. */
+  position: absolute;
+  top: calc(50% - var(--orb-size) / 2);
+  left: 0;
+  right: 0;
+  margin-inline: auto;
   width: var(--orb-size);
   height: var(--orb-size);
   display: flex;
@@ -330,15 +352,19 @@ body {
   opacity: 1 !important;
 }
 
-/* Absolutely positioned so the caption's top edge is always exactly
-   --orb-gap below the orb's bottom edge, and extra lines extend downward
-   without pushing the orb (or the first line) anywhere. */
+/* Pinned --orb-gap below the orb's bottom edge (and, like the orb, measured
+   from the screen), so the caption's first line is always in the same spot
+   and extra lines extend downward. It runs all the way to the bottom bar so
+   there's room for well past 4 lines; beyond that it scrolls. */
 .orb-status {
   position: absolute;
-  top: calc(var(--orb-top) + var(--orb-size) + var(--orb-gap));
+  top: calc(50% + var(--orb-size) / 2 + var(--orb-gap));
   left: 0;
   right: 0;
-  bottom: 0;
+  bottom: var(--bottom-bar-h);
+  /* Floor of 4 lines: on a viewport too short for that, the caption is
+     allowed to reach down toward the nav buttons rather than clip to 2. */
+  min-height: calc(4 * var(--caption-line));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -357,9 +383,16 @@ body {
   line-height: 1.5;
   color: var(--text);
   text-align: center;
-  max-width: 320px;
+  max-width: 340px;
 }
 .partial-caption { color: var(--text-mid); }
+
+/* While the checkpoint pills are up they occupy the strip just above the
+   bottom bar, so pull the caption's floor above them. Only the floor moves —
+   the top edge stays pinned under the orb. */
+.app--checkpoint .orb-status {
+  bottom: calc(var(--bottom-bar-h) + 52px);
+}
 .speaking-cursor {
   display: inline-block;
   width: 2px;

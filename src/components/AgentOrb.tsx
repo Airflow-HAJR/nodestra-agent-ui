@@ -10,8 +10,11 @@ interface AgentOrbProps {
 }
 
 function useOrbSize() {
-  // Keep in sync with --orb-size in index.css (0.58vw/213px, +25%).
-  const compute = () => Math.min(window.innerWidth * 0.725, 266)
+  // Keep in sync with --orb-size in index.css: 25% up from the old
+  // min(58vw, 213px), with a viewport-height cap so the caption underneath
+  // still has room for 4+ lines on a short screen.
+  const compute = () =>
+    Math.min(window.innerWidth * 0.725, 266, window.innerHeight * 0.32)
   const [size, setSize] = useState(compute)
 
   useEffect(() => {
