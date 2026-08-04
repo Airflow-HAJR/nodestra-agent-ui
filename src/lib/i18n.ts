@@ -16,7 +16,6 @@ export interface UIStrings {
   listening: string
   reconnecting: string
   disconnected: string
-  translating: string
   conversation: string
   back: string
   typeMessage: string
@@ -55,7 +54,6 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     listening: 'Listening…',
     reconnecting: 'Reconnecting…',
     disconnected: 'Disconnected',
-    translating: 'Translating…',
     conversation: 'Conversation',
     back: 'Back',
     typeMessage: 'Type a message…',
@@ -92,7 +90,6 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     listening: 'Escuchando…',
     reconnecting: 'Reconectando…',
     disconnected: 'Sin conexión',
-    translating: 'Traduciendo…',
     conversation: 'Conversación',
     back: 'Atrás',
     typeMessage: 'Escribe un mensaje…',
@@ -129,7 +126,6 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     listening: '正在聆听…',
     reconnecting: '正在重新连接…',
     disconnected: '已断开连接',
-    translating: '正在翻译…',
     conversation: '对话记录',
     back: '返回',
     typeMessage: '输入消息…',
@@ -166,7 +162,6 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     listening: 'À l’écoute…',
     reconnecting: 'Reconnexion…',
     disconnected: 'Déconnecté',
-    translating: 'Traduction…',
     conversation: 'Conversation',
     back: 'Retour',
     typeMessage: 'Écrivez un message…',
@@ -203,7 +198,6 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     listening: 'Hört zu…',
     reconnecting: 'Verbindung wird wiederhergestellt…',
     disconnected: 'Getrennt',
-    translating: 'Übersetzen…',
     conversation: 'Gespräch',
     back: 'Zurück',
     typeMessage: 'Nachricht schreiben…',
@@ -240,7 +234,6 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     listening: '聞いています…',
     reconnecting: '再接続中…',
     disconnected: '接続が切れました',
-    translating: '翻訳中…',
     conversation: '会話',
     back: '戻る',
     typeMessage: 'メッセージを入力…',
@@ -277,7 +270,6 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     listening: '듣고 있어요…',
     reconnecting: '다시 연결 중…',
     disconnected: '연결 끊김',
-    translating: '번역 중…',
     conversation: '대화',
     back: '뒤로',
     typeMessage: '메시지를 입력하세요…',
@@ -314,7 +306,6 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     listening: 'A ouvir…',
     reconnecting: 'A reconectar…',
     disconnected: 'Desligado',
-    translating: 'A traduzir…',
     conversation: 'Conversa',
     back: 'Voltar',
     typeMessage: 'Escreva uma mensagem…',
@@ -351,7 +342,6 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     listening: 'أستمع…',
     reconnecting: 'إعادة الاتصال…',
     disconnected: 'غير متصل',
-    translating: 'جارٍ الترجمة…',
     conversation: 'المحادثة',
     back: 'رجوع',
     typeMessage: 'اكتب رسالة…',
@@ -388,7 +378,6 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     listening: 'सुन रहा हूँ…',
     reconnecting: 'फिर से जोड़ रहे हैं…',
     disconnected: 'कनेक्शन नहीं है',
-    translating: 'अनुवाद हो रहा है…',
     conversation: 'बातचीत',
     back: 'वापस',
     typeMessage: 'संदेश लिखें…',
@@ -425,7 +414,6 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     listening: 'In ascolto…',
     reconnecting: 'Riconnessione…',
     disconnected: 'Disconnesso',
-    translating: 'Traduzione…',
     conversation: 'Conversazione',
     back: 'Indietro',
     typeMessage: 'Scrivi un messaggio…',
@@ -462,7 +450,6 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     listening: 'Слушаю…',
     reconnecting: 'Переподключение…',
     disconnected: 'Нет соединения',
-    translating: 'Перевод…',
     conversation: 'Разговор',
     back: 'Назад',
     typeMessage: 'Напишите сообщение…',

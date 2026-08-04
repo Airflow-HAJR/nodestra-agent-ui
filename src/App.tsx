@@ -255,8 +255,7 @@ export function App() {
     : 'disconnected'
   }`
 
-  const statusCaption = agent.pendingLanguage ? S.translating
-    : agent.muted ? S.muted
+  const statusCaption = agent.muted ? S.muted
     : isListening ? S.listening
     // thinkingLabel is the server's per-tool label ("Charting course…") and is
     // still English-only — fall back to the localized generic when absent.

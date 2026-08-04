@@ -57,7 +57,6 @@ export interface VoiceAgentHook {
   confirmCheckpoint: () => void
   requestCheckpointHelp: () => void
   detectedLanguage: string | null   // auto mode: what the server last heard
-  pendingLanguage: string | null    // a switch is in flight; transcript still retranslating
   changeLanguage: (lang: string) => void
 }
 
@@ -74,9 +73,6 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
   const [muted, setMuted] = useState(false)
   // Auto mode: what the server last heard. Null until someone speaks.
   const [detectedLanguage, setDetectedLanguage] = useState<string | null>(null)
-  // Set while a switch is in flight, so the UI can show the transcript is
-  // still being retranslated instead of looking frozen.
-  const [pendingLanguage, setPendingLanguage] = useState<string | null>(null)
   const [agentOutputLevel, setAgentOutputLevel] = useState(0)
 
   const wsRef = useRef<WebSocket | null>(null)
@@ -121,7 +117,6 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
   // Committed history, readable from callbacks without making them depend on
   // (and be recreated by) every message that lands.
   const messagesRef = useRef<Message[]>([])
-  const pendingLanguageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Mirrors streamingText so interrupt() can read the just-revealed portion
   // without depending on (and being recreated alongside) fast-changing state.
   const streamingTextRef = useRef('')
@@ -401,37 +396,17 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
     setAgentState('idle')
   }, [clearStream, stopOutputLevelMonitor])
 
-  // Switching language mid-conversation. Everything already on screen has to
-  // move over, not just what the agent says next — so the whole transcript
-  // goes to the server to be retranslated, and a reply that was still playing
-  // is cut off here and re-spoken from the top in the new language.
+  // Switching language mid-conversation: cut whatever is playing, and if
+  // something was, have the server produce that answer again in the new
+  // language. Text already on screen stays as it was spoken — it's a record of
+  // what was actually said, and rewriting it after the fact would misreport
+  // the conversation.
   const changeLanguage = useCallback((lang: string) => {
     const wasSpeaking = isPlayingRef.current || audioQueueRef.current.length > 0
-    // Grab this before stopPlayback clears it.
-    const interrupted = wasSpeaking ? speakingTextRef.current.trim() : ''
     if (wasSpeaking) stopPlayback()
     speakingTextRef.current = ''
-
-    const history: { id: string; role: 'user' | 'agent'; text: string }[] =
-      messagesRef.current.map(m => ({ id: m.id, role: m.role, text: m.text }))
-
-    // The interrupted turn was never committed to `messages` (that happens
-    // when its text finishes revealing), so it rides along under a synthetic
-    // id. The server translates it with the rest and speaks it back; the
-    // normal audio path is what finally commits it.
-    let speakId: string | undefined
-    if (interrupted) {
-      speakId = `resume-${Date.now()}`
-      history.push({ id: speakId, role: 'agent', text: interrupted })
-    }
-
     if (wsRef.current?.readyState !== WebSocket.OPEN) return
-    setPendingLanguage(lang)
-    wsRef.current.send(JSON.stringify({ type: 'set_language', language: lang, history, speakId }))
-    // The server always acks with history_translated, but a translation call
-    // that hangs shouldn't leave the caption stuck on "Translating…" forever.
-    if (pendingLanguageTimerRef.current) clearTimeout(pendingLanguageTimerRef.current)
-    pendingLanguageTimerRef.current = setTimeout(() => setPendingLanguage(null), 12000)
+    wsRef.current.send(JSON.stringify({ type: 'set_language', language: lang, resume: wasSpeaking }))
   }, [stopPlayback])
 
   // ─── WebSocket ──────────────────────────────────────────────────────
@@ -551,22 +526,6 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
             case 'language_detected':
               setDetectedLanguage(msg.language)
               break
-            case 'history_translated': {
-              // Match on id, so a turn that landed while the translation was
-              // in flight simply keeps its original text rather than being
-              // clobbered by a stale one.
-              const byId = new Map(msg.messages.map(m => [m.id, m.text]))
-              setMessages(prev => prev.map(m => {
-                const next = byId.get(m.id)
-                return next ? { ...m, text: next, language: msg.language } : m
-              }))
-              if (pendingLanguageTimerRef.current) {
-                clearTimeout(pendingLanguageTimerRef.current)
-                pendingLanguageTimerRef.current = null
-              }
-              setPendingLanguage(null)
-              break
-            }
           }
         } catch { /* ignore malformed */ }
       }
@@ -590,7 +549,6 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
     return () => {
       isMountedRef.current = false
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current)
-      if (pendingLanguageTimerRef.current) clearTimeout(pendingLanguageTimerRef.current)
       clearStream()
       stopOutputLevelMonitor()
       wsRef.current?.close()
@@ -788,6 +746,6 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
     muted, toggleMute, interrupt, sendText,
     startListening, stopListening, clearMessages, unlockAudio,
     sendLocation,
-    detectedLanguage, pendingLanguage, changeLanguage,
+    detectedLanguage, changeLanguage,
   }
 }
