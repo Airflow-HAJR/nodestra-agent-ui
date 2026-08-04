@@ -487,6 +487,18 @@ export function App() {
                 </span>
               )}
             </button>
+
+            <button
+              className="bottom-icon-btn"
+              onClick={(e) => { e.stopPropagation(); setOverflowOpen(true) }}
+              aria-label="Change language"
+            >
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M3 12h18" />
+                <path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z" />
+              </svg>
+            </button>
           </>
         )}
       </div>

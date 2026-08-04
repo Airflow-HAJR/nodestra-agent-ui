@@ -99,16 +99,17 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: calc(var(--safe-top) + 18px) 20px 14px;
-  border-bottom: 1px solid var(--border);
+  padding: calc(var(--safe-top) + 16px) 20px 12px;
   position: relative;
 }
 
+/* A quiet label naming where you are, not a page title — no bold, no tight
+   tracking, and set in the mid grey so the orb stays the loudest thing on
+   screen. */
 .header-title {
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-mid);
 }
 
 .header-right {
@@ -117,15 +118,18 @@ body {
   gap: 12px;
 }
 
+/* Small and desaturated: connection state is ambient, and a bright signal
+   dot up top competes with the orb for attention. Only the states that
+   actually need the user to act stay vivid. */
 .header-dot {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
 }
-.header-dot--connected    { background: #22c55e; }
-.header-dot--reconnecting { background: #f59e0b; animation: blink-dot 1s infinite; }
-.header-dot--disconnected { background: #ef4444; }
+.header-dot--connected    { background: #C3D9C9; }
+.header-dot--reconnecting { background: #E0B270; animation: blink-dot 1s infinite; }
+.header-dot--disconnected { background: #D98C8C; }
 
 .header-overflow-btn {
   width: 32px;
@@ -450,7 +454,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 22px;
+  /* Tightened from 22px to keep four buttons off the screen edges on a
+     narrow phone. */
+  gap: 18px;
   padding: 10px 20px calc(var(--safe-bottom) + 20px);
   position: relative;
   z-index: 2;
