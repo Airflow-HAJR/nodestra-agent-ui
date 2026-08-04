@@ -164,9 +164,17 @@ export function App() {
     if (historyOpen) setHistoryOpen(false)
   }
 
+  // Falls back to the raw code so an unrecognised stored language still shows
+  // something rather than an empty pill.
+  const activeLanguageName =
+    LANGUAGES.find(l => l.code === language)?.nativeName ?? language
+
   const handleLanguageSelect = useCallback((lang: Language) => {
     setLanguage(lang.code)
     try { localStorage.setItem(LANGUAGE_STORAGE_KEY, lang.code) } catch { /* ignore */ }
+    // The header pill is the confirmation now, so there's nothing left to do
+    // in the sheet once a language is picked.
+    setOverflowOpen(false)
   }, [])
 
   const handleSmsSubmit = useCallback(async () => {
@@ -305,13 +313,16 @@ export function App() {
         <span className="header-title">Oakland International Airport</span>
         <div className="header-right">
           <span className={dotClass} />
+          {/* Names the language that's actually active, and is the way to
+              change it — the old "..." menu hid both facts behind an icon. */}
           <button
-            className="header-overflow-btn"
+            className="header-lang-pill"
             onClick={(e) => { e.stopPropagation(); setOverflowOpen(true) }}
-            aria-label="Settings"
+            aria-label={`Language: ${activeLanguageName}. Change language`}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="1" /><circle cx="12" cy="5" r="1" /><circle cx="12" cy="19" r="1" />
+            {activeLanguageName}
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9" />
             </svg>
           </button>
         </div>
@@ -487,18 +498,6 @@ export function App() {
                 </span>
               )}
             </button>
-
-            <button
-              className="bottom-icon-btn"
-              onClick={(e) => { e.stopPropagation(); setOverflowOpen(true) }}
-              aria-label="Change language"
-            >
-              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="9" />
-                <path d="M3 12h18" />
-                <path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z" />
-              </svg>
-            </button>
           </>
         )}
       </div>
@@ -562,16 +561,6 @@ export function App() {
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                 </svg>
                 Text me instead
-              </button>
-              <button
-                className="settings-action-btn"
-                onClick={() => { setOverflowOpen(false); setMapSheetOpen(true) }}
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="10" r="3" />
-                  <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 14 8 14s8-8.75 8-14a8 8 0 0 0-8-8z" />
-                </svg>
-                Show map
               </button>
             </div>
           </div>

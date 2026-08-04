@@ -131,21 +131,27 @@ body {
 .header-dot--reconnecting { background: #E0B270; animation: blink-dot 1s infinite; }
 .header-dot--disconnected { background: #D98C8C; }
 
-.header-overflow-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: none;
-  background: none;
+/* Sits at the same weight as the header title so the two read as one quiet
+   line, with the chevron as the only hint that it opens something. */
+.header-lang-pill {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 5px;
+  padding: 5px 10px 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: none;
   color: var(--text-mid);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
   cursor: pointer;
-  transition: color 0.15s;
+  transition: border-color 0.15s, color 0.15s;
   -webkit-appearance: none;
 }
-.header-overflow-btn:hover { color: var(--mauve); }
+.header-lang-pill:hover { border-color: var(--mauve); color: var(--mauve); }
+.header-lang-pill svg { opacity: 0.6; }
 
 /* ─── Chat area (conversation history) ───────────────────────── */
 .chat-area {
@@ -454,9 +460,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Tightened from 22px to keep four buttons off the screen edges on a
-     narrow phone. */
-  gap: 18px;
+  gap: 22px;
   padding: 10px 20px calc(var(--safe-bottom) + 20px);
   position: relative;
   z-index: 2;
