@@ -124,11 +124,14 @@ function MapCanvas({ action, userLat, userLng, uiLang }: { action: MapActionPayl
         overlaysRef.current.push(overlay)
       }
 
-      const addMarker = (pos: { lat: number; lng: number }, label: string, color: string, active?: boolean) => {
+      // Deliberately unlabelled. The dots were numbered, but the number was
+      // never information the user needed — the route line already gives the
+      // order, and the stop that matters is the highlighted one, which now
+      // carries its actual name.
+      const addMarker = (pos: { lat: number; lng: number }, color: string, active?: boolean) => {
         const marker = new google.maps.Marker({
           position: pos,
           map,
-          label: label ? { text: label, color: '#fff', fontSize: active ? '13px' : '11px', fontWeight: '700' } : undefined,
           icon: {
             path: google.maps.SymbolPath.CIRCLE,
             scale: active ? 14 : 10,
@@ -194,7 +197,7 @@ function MapCanvas({ action, userLat, userLng, uiLang }: { action: MapActionPayl
       }
 
       if (action.type === 'show_destination') {
-        addMarker(action.destination, '', DESTINATION_COLOR)
+        addMarker(action.destination, DESTINATION_COLOR)
         addLabel(action.destination, action.destination.name, 'endpoint')
         map.setCenter(action.destination)
         map.setZoom(18)
@@ -203,7 +206,7 @@ function MapCanvas({ action, userLat, userLng, uiLang }: { action: MapActionPayl
 
       if (action.type === 'show_directions') {
         const origin = action.origin ?? (userLat != null && userLng != null ? { lat: userLat, lng: userLng } : null)
-        addMarker(action.destination, '', DESTINATION_COLOR)
+        addMarker(action.destination, DESTINATION_COLOR)
         addLabel(action.destination, action.destination.name, 'endpoint')
         if (origin) {
           addUserDot(origin)
@@ -222,7 +225,7 @@ function MapCanvas({ action, userLat, userLng, uiLang }: { action: MapActionPayl
       if (action.type === 'show_route' && action.stops.length >= 2) {
         action.stops.forEach((stop, i) => {
           const color = i === 0 ? ORIGIN_COLOR : i === action.stops.length - 1 ? DESTINATION_COLOR : WAYPOINT_COLOR
-          addMarker(stop, String(i + 1), color)
+          addMarker(stop, color)
         })
         addLabel(action.stops[0], action.stops[0].name, 'endpoint')
         const lastStop = action.stops[action.stops.length - 1]
@@ -266,7 +269,7 @@ function MapCanvas({ action, userLat, userLng, uiLang }: { action: MapActionPayl
             else if (isLastOfSegment && isFinalSegment) color = DESTINATION_COLOR
             else if (stop.isPortal) color = PORTAL_COLOR
             if (isActive) color = ACTIVE_COLOR
-            addMarker(stop, String(stop.index + 1), color, isActive)
+            addMarker(stop, color, isActive)
             // Named first, so that when the stop being walked to is also an
             // endpoint it gets the active chip rather than the plain one.
             if (isActive) addLabel(stop, stop.name, 'active')
