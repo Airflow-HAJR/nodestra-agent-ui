@@ -16,6 +16,7 @@ const DESTINATION_COLOR = '#EA4335'
 const WAYPOINT_COLOR = '#34A853'
 const PORTAL_COLOR = '#FBBC05' // elevator/escalator/stairs — the checkpoint the user is heading to on this floor
 const ACTIVE_COLOR = '#9C27B0' // the specific stop the user is currently being guided to — always wins over other colors
+const USER_DOT_COLOR = '#1A73E8' // "you are here" — Google's own blue-dot blue
 
 // Renders markers + a manually-drawn polyline on a real Google Maps JS
 // instance. We do NOT use the Embed API's `directions` mode here — Google's
@@ -71,6 +72,45 @@ function MapCanvas({ action, userLat, userLng }: { action: MapActionPayload; use
         bounds.extend(pos)
       }
 
+      // The "you are here" dot, drawn the way Google Maps draws it: a solid
+      // blue core with a white collar, sitting on a soft accuracy halo. It is
+      // deliberately NOT a numbered stop — the user's own position isn't
+      // somewhere they have to walk to, and numbering it made stop 1 look
+      // like a destination.
+      const addUserDot = (pos: { lat: number; lng: number }) => {
+        const halo = new google.maps.Marker({
+          position: pos,
+          map,
+          clickable: false,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 22,
+            fillColor: USER_DOT_COLOR,
+            fillOpacity: 0.16,
+            strokeWeight: 0,
+          },
+          zIndex: 28,
+        })
+        const dot = new google.maps.Marker({
+          position: pos,
+          map,
+          clickable: false,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 8,
+            fillColor: USER_DOT_COLOR,
+            fillOpacity: 1,
+            strokeColor: '#fff',
+            strokeWeight: 3,
+          },
+          // Above every route marker: it should never end up hidden behind a
+          // stop that happens to sit on the same spot.
+          zIndex: 30,
+        })
+        overlaysRef.current.push(halo, dot)
+        bounds.extend(pos)
+      }
+
       const drawRoute = (path: { lat: number; lng: number }[]) => {
         const line = new google.maps.Polyline({
           path,
@@ -93,7 +133,7 @@ function MapCanvas({ action, userLat, userLng }: { action: MapActionPayload; use
         const origin = action.origin ?? (userLat != null && userLng != null ? { lat: userLat, lng: userLng } : null)
         addMarker(action.destination, '', DESTINATION_COLOR)
         if (origin) {
-          addMarker(origin, '', ORIGIN_COLOR)
+          addUserDot(origin)
           drawRoute([origin, action.destination])
           map.fitBounds(bounds, 48)
         } else {
@@ -125,8 +165,18 @@ function MapCanvas({ action, userLat, userLng }: { action: MapActionPayload; use
         const seg = action.segments[action.activeSegmentIndex] ?? action.segments[0]
         if (seg && seg.stops.length > 0) {
           const isFinalSegment = action.activeSegmentIndex === action.segments.length - 1
+          // Stop 0 of the very first segment is where the route starts, i.e.
+          // where the user is standing — that one becomes the blue dot rather
+          // than a numbered pin. On later segments stop 0 is a portal exit on
+          // a new floor, which is a real place to walk to, so it keeps its
+          // number.
+          const originIsUser = action.activeSegmentIndex === 0
           seg.stops.forEach((stop, i) => {
             const isFirst = i === 0
+            if (isFirst && originIsUser) {
+              addUserDot(stop)
+              return
+            }
             const isLastOfSegment = i === seg.stops.length - 1
             const isActive = stop.index === action.activeStopIndex
             let color: string = WAYPOINT_COLOR

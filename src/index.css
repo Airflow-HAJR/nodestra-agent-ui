@@ -11,9 +11,9 @@
   --border:      #EBEBEB;
   --surface:     #F5F5F5;
   /* Orb diameter. Keep in sync with useOrbSize() in AgentOrb.tsx. The 32vh
-     cap is what guarantees the caption below still gets its 4+ lines on a
-     short viewport (mobile Safari with the URL bar showing) instead of the
-     orb eating the whole screen. */
+     cap, together with --orb-center, is what guarantees the caption below
+     still gets its 5+ lines on a short viewport (mobile Safari with the URL
+     bar showing) instead of the orb eating the whole screen. */
   --orb-size:    min(72.5vw, 266px, 32vh);
   /* svh (the viewport with the browser bars showing) is what window.innerHeight
      actually reports for this never-scrolling layout, so the CSS box and the
@@ -23,6 +23,12 @@
      line, so the caption's top never moves as its text grows. */
   --orb-gap:     18px;
   --caption-line: 22.5px;          /* 15px font x 1.5 line-height */
+  /* Orb's vertical centre. Sits above the true middle so the caption gets an
+     extra line without the orb having to shrink — the space it gives up was
+     dead room between the history strip and the orb's top edge. Every 3% of
+     viewport height moved up is worth roughly one more caption line on a
+     phone-sized screen. */
+  --orb-center:  46.5%;
   /* Height of the bottom bar (44px button + 10px/20px padding), used as the
      caption's floor so long text never runs under the nav buttons. */
   --bottom-bar-h: calc(var(--safe-bottom) + 74px);
@@ -329,7 +335,7 @@ body {
      with auto margins rather than translateX so it never fights the
      `scale()` transform the speaking pulse writes inline. */
   position: absolute;
-  top: calc(50% - var(--orb-size) / 2);
+  top: calc(var(--orb-center) - var(--orb-size) / 2);
   left: 0;
   right: 0;
   margin-inline: auto;
@@ -374,16 +380,16 @@ body {
 /* Pinned --orb-gap below the orb's bottom edge (and, like the orb, measured
    from the screen), so the caption's first line is always in the same spot
    and extra lines extend downward. It runs all the way to the bottom bar so
-   there's room for well past 4 lines; beyond that it scrolls. */
+   there's room for well past 5 lines; beyond that it scrolls. */
 .orb-status {
   position: absolute;
-  top: calc(50% + var(--orb-size) / 2 + var(--orb-gap));
+  top: calc(var(--orb-center) + var(--orb-size) / 2 + var(--orb-gap));
   left: 0;
   right: 0;
   /* Hard floor. Deliberately no min-height — a min-height would win over
      top/bottom and let the box grow back down over the checkpoint pills. The
-     4-line guarantee comes from the --orb-size cap keeping this box tall
-     enough, not from forcing a height here. */
+     5-line guarantee comes from --orb-size and --orb-center keeping this box
+     tall enough, not from forcing a height here. */
   bottom: var(--caption-floor);
   overflow: hidden;
 }
