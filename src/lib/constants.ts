@@ -44,6 +44,24 @@ export const SIGNIN_NUDGE_DELAY_MS = 6000
  *  between an outbound and a return leg, so each trip gets its own ask. */
 export const SIGNIN_NUDGE_REARM_MS = 12 * 60 * 60 * 1000
 
+// ── Voice settings ──
+// Speed bounds are the intersection of what the two TTS providers accept
+// (ElevenLabs 0.7–1.2, Cartesia 0.6–1.5). The server clamps to the same range,
+// so these two numbers are a UI convenience, not the safety net.
+export const VOICE_SPEED_MIN = 0.7
+export const VOICE_SPEED_MAX = 1.2
+export const VOICE_SPEED_DEFAULT = 1.0
+export const VOICE_SPEED_STEP = 0.05
+
+// 0 is even and level, 1 is at its most animated. Maps to ElevenLabs'
+// `stability` inverted, which the server does — the UI never sees that word.
+export const VOICE_EXPRESSIVENESS_MIN = 0
+export const VOICE_EXPRESSIVENESS_MAX = 1
+export const VOICE_EXPRESSIVENESS_DEFAULT = 0.5
+export const VOICE_EXPRESSIVENESS_STEP = 0.05
+
+export const VOICE_SETTINGS_STORAGE_KEY = 'nodestra_voice_settings'
+
 export const WS_URL = import.meta.env['VITE_WS_URL'] as string | undefined
   ?? 'ws://localhost:8000/web/stream'
 

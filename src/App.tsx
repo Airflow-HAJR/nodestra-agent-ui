@@ -7,14 +7,15 @@ import { CheckpointConfirmButton } from './components/CheckpointConfirmButton'
 import { AccountButton } from './components/AccountButton'
 import { AccountSheet } from './components/AccountSheet'
 import { SignInNudge } from './components/SignInNudge'
+import { VoiceSettings } from './components/VoiceSettings'
 import { useVoiceAgent } from './hooks/useVoiceAgent'
 import { useAuth } from './hooks/useAuth'
 import { useGeolocation } from './hooks/useGeolocation'
 import { useTypewriter } from './hooks/useTypewriter'
-import { LANGUAGES, AUTO_LANGUAGE, DEFAULT_LANGUAGE, LANGUAGE_STORAGE_KEY, API_BASE_URL, WS_URL, GOOGLE_MAPS_API_KEY, AGENT_AVATAR_URL, SIGNIN_NUDGE_STORAGE_KEY, SIGNIN_NUDGE_DELAY_MS, SIGNIN_NUDGE_REARM_MS } from './lib/constants'
+import { LANGUAGES, AUTO_LANGUAGE, DEFAULT_LANGUAGE, LANGUAGE_STORAGE_KEY, API_BASE_URL, WS_URL, GOOGLE_MAPS_API_KEY, AGENT_AVATAR_URL, SIGNIN_NUDGE_STORAGE_KEY, SIGNIN_NUDGE_DELAY_MS, SIGNIN_NUDGE_REARM_MS, VOICE_SETTINGS_STORAGE_KEY, VOICE_SPEED_DEFAULT, VOICE_SPEED_MIN, VOICE_SPEED_MAX, VOICE_EXPRESSIVENESS_DEFAULT } from './lib/constants'
 import { uiLanguage, strings, RTL_LANGUAGES } from './lib/i18n'
 import { haversineMeters } from './lib/geo'
-import type { Language } from './lib/types'
+import type { Language, VoiceSettings as VoiceSettingsValue } from './lib/types'
 
 const TWILIO_NUMBER = import.meta.env.VITE_TWILIO_NUMBER ?? ''
 
@@ -23,6 +24,33 @@ const MAP_COLLAPSE_ANIM_MS = 500
 
 function getStoredLanguage(): string {
   try { return localStorage.getItem(LANGUAGE_STORAGE_KEY) ?? DEFAULT_LANGUAGE } catch { return DEFAULT_LANGUAGE }
+}
+
+const DEFAULT_VOICE: VoiceSettingsValue = {
+  speed: VOICE_SPEED_DEFAULT,
+  expressiveness: VOICE_EXPRESSIVENESS_DEFAULT,
+}
+
+/** Voice sliders as last left on this device.
+ *
+ *  Read defensively rather than trusted: this is the one bit of state the app
+ *  restores straight into an outbound message, and a hand-edited or
+ *  half-written localStorage entry shouldn't be able to make the agent mute
+ *  itself. The server clamps too — this is just the nearer of the two nets. */
+function getStoredVoice(): VoiceSettingsValue {
+  try {
+    const raw = localStorage.getItem(VOICE_SETTINGS_STORAGE_KEY)
+    if (!raw) return DEFAULT_VOICE
+    const parsed = JSON.parse(raw) as Partial<VoiceSettingsValue>
+    const clamp = (n: unknown, lo: number, hi: number, fallback: number) =>
+      typeof n === 'number' && Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : fallback
+    return {
+      speed: clamp(parsed?.speed, VOICE_SPEED_MIN, VOICE_SPEED_MAX, VOICE_SPEED_DEFAULT),
+      expressiveness: clamp(parsed?.expressiveness, 0, 1, VOICE_EXPRESSIVENESS_DEFAULT),
+    }
+  } catch {
+    return DEFAULT_VOICE
+  }
 }
 
 /** Whether this visit is allowed to make the sign-in offer. */
@@ -60,6 +88,7 @@ export function App() {
   const [textValue, setTextValue]     = useState('')
   const [smsPhone, setSmsPhone]   = useState('')
   const [smsSent, setSmsSent]     = useState(false)
+  const [voice, setVoice]         = useState<VoiceSettingsValue>(getStoredVoice)
 
   const geo   = useGeolocation()
   // Identity comes from the auth hook whether or not anyone has signed in: it
@@ -72,6 +101,7 @@ export function App() {
     userId: auth.userId,
     accessToken: auth.accessToken,
     authReady: auth.ready,
+    voice,
   })
 
   // Under auto the chrome follows whatever the server last heard, so the whole
@@ -95,6 +125,16 @@ export function App() {
     setNudgeOpen(false)
     try { localStorage.setItem(SIGNIN_NUDGE_STORAGE_KEY, String(Date.now())) } catch { /* asked anyway */ }
   }, [])
+
+  // Persist first, then push. Persisting is what makes the setting survive the
+  // walk to the gate; the send is what makes the current conversation obey it.
+  // A failed write must not stop the send — the session should still sound
+  // right even on a browser that refuses storage.
+  const handleVoiceChange = useCallback((next: VoiceSettingsValue) => {
+    setVoice(next)
+    try { localStorage.setItem(VOICE_SETTINGS_STORAGE_KEY, JSON.stringify(next)) } catch { /* session-only */ }
+    agent.setVoice(next)
+  }, [agent])
 
   useEffect(() => {
     if (!auth.available || !auth.ready) return
@@ -619,6 +659,8 @@ export function App() {
                 </button>
               ))}
             </div>
+            <VoiceSettings value={voice} uiLang={uiLang} onChange={handleVoiceChange} />
+
             <div className="settings-actions">
               <button
                 className="settings-action-btn"

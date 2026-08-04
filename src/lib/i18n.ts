@@ -61,6 +61,14 @@ export interface UIStrings {
   nudgeTitle: string
   nudgeBody: string
   notNow: string
+  voice: string
+  voiceSpeed: string
+  voiceExpressiveness: string
+  voiceSlower: string
+  voiceFaster: string
+  voiceEven: string
+  voiceLively: string
+  voiceReset: string
 }
 
 export const UI_STRINGS: Record<string, UIStrings> = {
@@ -118,6 +126,14 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     nudgeTitle: 'Save your preferences',
     nudgeBody: "Connect your Google account and I'll remember your preferences for your every airport visit. Your diet, lounge preferences, even your favorite pizza toppings, you name it!",
     notNow: 'Not now',
+    voice: "Voice",
+    voiceSpeed: "Speed",
+    voiceExpressiveness: "Expressiveness",
+    voiceSlower: "Slower",
+    voiceFaster: "Faster",
+    voiceEven: "Even",
+    voiceLively: "Lively",
+    voiceReset: "Reset to default",
   },
   es: {
     appTitle: 'Aeropuerto Internacional de Oakland',
@@ -173,6 +189,14 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     nudgeTitle: 'Guarda tus preferencias',
     nudgeBody: "Conecta tu cuenta de Google y recordaré tus preferencias en cada visita al aeropuerto. Tu dieta, las salas VIP que prefieres, hasta los ingredientes de tu pizza favorita. ¡Lo que se te ocurra!",
     notNow: 'Ahora no',
+    voice: "Voz",
+    voiceSpeed: "Velocidad",
+    voiceExpressiveness: "Expresividad",
+    voiceSlower: "Más lento",
+    voiceFaster: "Más rápido",
+    voiceEven: "Neutra",
+    voiceLively: "Animada",
+    voiceReset: "Restablecer",
   },
   zh: {
     appTitle: '奥克兰国际机场',
@@ -228,6 +252,14 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     nudgeTitle: '保存您的偏好',
     nudgeBody: "关联您的 Google 账户，我就会记住您每次来机场的偏好。饮食、常去的休息室，甚至您最爱的披萨配料，都可以告诉我！",
     notNow: '暂不',
+    voice: "语音",
+    voiceSpeed: "语速",
+    voiceExpressiveness: "表现力",
+    voiceSlower: "更慢",
+    voiceFaster: "更快",
+    voiceEven: "平稳",
+    voiceLively: "生动",
+    voiceReset: "恢复默认",
   },
   fr: {
     appTitle: 'Aéroport international d’Oakland',
@@ -283,6 +315,14 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     nudgeTitle: 'Enregistrez vos préférences',
     nudgeBody: "Connectez votre compte Google et je retiendrai vos préférences à chaque passage à l'aéroport. Votre régime, vos salons préférés, jusqu'à la garniture de votre pizza. Tout ce que vous voulez !",
     notNow: 'Pas maintenant',
+    voice: "Voix",
+    voiceSpeed: "Vitesse",
+    voiceExpressiveness: "Expressivité",
+    voiceSlower: "Plus lent",
+    voiceFaster: "Plus rapide",
+    voiceEven: "Neutre",
+    voiceLively: "Vivante",
+    voiceReset: "Réinitialiser",
   },
   de: {
     appTitle: 'Oakland International Airport',
@@ -338,6 +378,14 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     nudgeTitle: 'Vorlieben speichern',
     nudgeBody: "Verbinden Sie Ihr Google-Konto, dann merke ich mir Ihre Vorlieben für jeden Besuch am Flughafen. Ihre Ernährung, Ihre Lounges, sogar Ihren Lieblingspizzabelag. Sagen Sie einfach Bescheid!",
     notNow: 'Später',
+    voice: "Stimme",
+    voiceSpeed: "Tempo",
+    voiceExpressiveness: "Ausdruck",
+    voiceSlower: "Langsamer",
+    voiceFaster: "Schneller",
+    voiceEven: "Gleichmäßig",
+    voiceLively: "Lebhaft",
+    voiceReset: "Zurücksetzen",
   },
   ja: {
     appTitle: 'オークランド国際空港',
@@ -393,6 +441,14 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     nudgeTitle: '設定を保存します',
     nudgeBody: "Google アカウントを連携すると、空港に来られるたびにお好みを覚えておきます。食事のこと、よく使うラウンジ、好きなピザの具まで、何でもどうぞ！",
     notNow: '今はしない',
+    voice: "音声",
+    voiceSpeed: "話す速さ",
+    voiceExpressiveness: "抑揚",
+    voiceSlower: "ゆっくり",
+    voiceFaster: "速く",
+    voiceEven: "平坦",
+    voiceLively: "豊か",
+    voiceReset: "初期設定に戻す",
   },
   ko: {
     appTitle: '오클랜드 국제공항',
@@ -448,6 +504,14 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     nudgeTitle: '설정을 저장하세요',
     nudgeBody: "Google 계정을 연결하면 공항에 오실 때마다 취향을 기억해 둘게요. 식단, 자주 가는 라운지, 좋아하는 피자 토핑까지 뭐든 말씀해 주세요!",
     notNow: '나중에',
+    voice: "음성",
+    voiceSpeed: "말하기 속도",
+    voiceExpressiveness: "표현력",
+    voiceSlower: "느리게",
+    voiceFaster: "빠르게",
+    voiceEven: "차분하게",
+    voiceLively: "생동감 있게",
+    voiceReset: "기본값으로",
   },
   pt: {
     appTitle: 'Aeroporto Internacional de Oakland',
@@ -503,6 +567,14 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     nudgeTitle: 'Guarde as suas preferências',
     nudgeBody: "Ligue a sua conta Google e vou lembrar-me das suas preferências em cada visita ao aeroporto. A sua dieta, os lounges que prefere, até os ingredientes da sua pizza favorita. É só dizer!",
     notNow: 'Agora não',
+    voice: "Voz",
+    voiceSpeed: "Velocidade",
+    voiceExpressiveness: "Expressividade",
+    voiceSlower: "Mais lento",
+    voiceFaster: "Mais rápido",
+    voiceEven: "Neutra",
+    voiceLively: "Animada",
+    voiceReset: "Repor",
   },
   ar: {
     appTitle: 'مطار أوكلاند الدولي',
@@ -558,6 +630,14 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     nudgeTitle: 'احفظ تفضيلاتك',
     nudgeBody: "اربط حساب Google وسأتذكّر تفضيلاتك في كل زيارة للمطار. نظامك الغذائي، الصالات التي تفضّلها، وحتى إضافات البيتزا المفضّلة لديك. أخبرني بما تشاء!",
     notNow: 'ليس الآن',
+    voice: "الصوت",
+    voiceSpeed: "السرعة",
+    voiceExpressiveness: "التعبير",
+    voiceSlower: "أبطأ",
+    voiceFaster: "أسرع",
+    voiceEven: "هادئ",
+    voiceLively: "حيوي",
+    voiceReset: "إعادة الضبط",
   },
   hi: {
     appTitle: 'ओकलैंड इंटरनेशनल एयरपोर्ट',
@@ -613,6 +693,14 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     nudgeTitle: 'अपनी पसंद सहेजें',
     nudgeBody: "अपना Google खाता जोड़ें और मैं हर बार एयरपोर्ट आने पर आपकी पसंद याद रखूँगा। आपका खानपान, पसंदीदा लाउंज, यहाँ तक कि पिज़्ज़ा की टॉपिंग भी। जो चाहें बताइए!",
     notNow: 'अभी नहीं',
+    voice: "आवाज़",
+    voiceSpeed: "गति",
+    voiceExpressiveness: "अभिव्यक्ति",
+    voiceSlower: "धीमा",
+    voiceFaster: "तेज़",
+    voiceEven: "सपाट",
+    voiceLively: "जीवंत",
+    voiceReset: "रीसेट करें",
   },
   it: {
     appTitle: 'Aeroporto Internazionale di Oakland',
@@ -668,6 +756,14 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     nudgeTitle: 'Salva le tue preferenze',
     nudgeBody: "Collega il tuo account Google e ricorderò le tue preferenze a ogni visita in aeroporto. La tua dieta, le lounge che preferisci, perfino il condimento della tua pizza. Quello che vuoi!",
     notNow: 'Non ora',
+    voice: "Voce",
+    voiceSpeed: "Velocità",
+    voiceExpressiveness: "Espressività",
+    voiceSlower: "Più lento",
+    voiceFaster: "Più veloce",
+    voiceEven: "Neutra",
+    voiceLively: "Vivace",
+    voiceReset: "Ripristina",
   },
   ru: {
     appTitle: 'Международный аэропорт Окленда',
@@ -723,6 +819,14 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     nudgeTitle: 'Сохраните свои предпочтения',
     nudgeBody: "Подключите аккаунт Google, и я буду помнить ваши предпочтения при каждом приезде в аэропорт. Питание, любимые лаунжи, даже начинку для пиццы. Что угодно!",
     notNow: 'Не сейчас',
+    voice: "Голос",
+    voiceSpeed: "Скорость",
+    voiceExpressiveness: "Выразительность",
+    voiceSlower: "Медленнее",
+    voiceFaster: "Быстрее",
+    voiceEven: "Ровно",
+    voiceLively: "Живо",
+    voiceReset: "Сбросить",
   },
 }
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import type { AgentState, CheckpointPrompt, ConnectionState, MapActionPayload, Message, VoiceAgentConfig, ServerMessage } from '../lib/types'
+import type { AgentState, CheckpointPrompt, ConnectionState, MapActionPayload, Message, VoiceAgentConfig, VoiceSettings, ServerMessage } from '../lib/types'
 import { useAudioRecorder } from './useAudioRecorder'
 import {
   RECONNECT_BASE_DELAY_MS, RECONNECT_MAX_DELAY_MS, RECONNECT_MAX_ATTEMPTS,
@@ -64,6 +64,9 @@ export interface VoiceAgentHook {
   detectedLanguage: string | null   // auto mode: what the server last heard
   memoryPersisted: boolean | null   // server's verdict: is this session's memory durable?
   changeLanguage: (lang: string) => void
+  /** Retunes the voice for everything spoken from here on. Nothing already
+   *  playing is regenerated — a slider isn't worth interrupting a sentence. */
+  setVoice: (voice: VoiceSettings) => void
 }
 
 export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
@@ -445,9 +448,19 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
       language: configRef.current.language,
       userId: configRef.current.userId,
       accessToken: configRef.current.accessToken ?? null,
+      voice: configRef.current.voice,
       greet,
     }))
     return true
+  }, [])
+
+  /** Push the sliders to the server. Silently a no-op while the socket is
+   *  down — the value is already in configRef, so the reconnect's config
+   *  carries it and nothing is lost. */
+  const setVoice = useCallback((voice: VoiceSettings) => {
+    const ws = wsRef.current
+    if (ws?.readyState !== WebSocket.OPEN) return
+    ws.send(JSON.stringify({ type: 'set_voice', voice }))
   }, [])
 
   const scheduleReconnect = useCallback(() => {
@@ -862,5 +875,6 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
     startListening, stopListening, clearMessages, unlockAudio,
     sendLocation,
     detectedLanguage, memoryPersisted, changeLanguage,
+    setVoice,
   }
 }

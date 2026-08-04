@@ -28,6 +28,18 @@ export interface VoiceAgentConfig {
   // holds its opening config until this is true so a returning user is greeted
   // as themselves rather than as a stranger.
   authReady?: boolean
+  // How the agent should sound. Sent with the opening config so a returning
+  // traveler's settings apply to the greeting, then again whenever a slider
+  // moves.
+  voice?: VoiceSettings
+}
+
+/** The two knobs the settings sheet exposes. Both are clamped server-side. */
+export interface VoiceSettings {
+  /** Words per minute, near enough. 1.0 is the voice's own pace. */
+  speed: number
+  /** 0 = even and level, 1 = at its most animated. */
+  expressiveness: number
 }
 
 export interface GeolocationState {
@@ -125,7 +137,9 @@ export type ClientMessage =
   | { type: 'audio_chunk'; data: string }
   | { type: 'audio_end' }
   | { type: 'text'; text: string; language: string }
-  | { type: 'config'; language: string; userId?: string; accessToken?: string | null; greet?: boolean }
+  | { type: 'config'; language: string; userId?: string; accessToken?: string | null; greet?: boolean; voice?: VoiceSettings }
+  // Takes effect on the next thing spoken; nothing already playing is redone.
+  | { type: 'set_voice'; voice: VoiceSettings }
   // resume: a reply was mid-playback, so regenerate it in the new language.
   | { type: 'set_language'; language: string; resume: boolean }
   | { type: 'ping' }
