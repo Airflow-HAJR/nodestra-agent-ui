@@ -22,6 +22,7 @@
   /* Constant gap between the orb's bottom edge and the caption's first
      line, so the caption's top never moves as its text grows. */
   --orb-gap:     18px;
+  --caption-line: 22.5px;          /* 15px font x 1.5 line-height */
   /* Height of the bottom bar (44px button + 10px/20px padding), used as the
      caption's floor so long text never runs under the nav buttons. */
   --bottom-bar-h: calc(var(--safe-bottom) + 74px);
@@ -390,21 +391,25 @@ body {
 }
 .orb-status-scroll::-webkit-scrollbar { display: none; }
 
-/* When text runs past the box, ramp the last ~40px toward (but not all the
-   way to) transparent, so the clipped line fades out instead of ending at a
-   hard edge. */
+/* When text runs past the box, every line but the last stays at full
+   strength; the last one steps down to a faint 16% so it still reads as a
+   line of text that's trailing off, rather than dimming the line above it
+   too. The step is sized in --caption-line and measured from the bottom,
+   which is where the final line sits once the text has filled the box. */
 .orb-status--more .orb-status-scroll {
   -webkit-mask-image: linear-gradient(
     to bottom,
     #000 0,
-    #000 calc(100% - 40px),
-    rgba(0, 0, 0, 0.28) 100%
+    #000 calc(100% - var(--caption-line) - 6px),
+    rgba(0, 0, 0, 0.16) calc(100% - var(--caption-line) + 2px),
+    rgba(0, 0, 0, 0.16) 100%
   );
   mask-image: linear-gradient(
     to bottom,
     #000 0,
-    #000 calc(100% - 40px),
-    rgba(0, 0, 0, 0.28) 100%
+    #000 calc(100% - var(--caption-line) - 6px),
+    rgba(0, 0, 0, 0.16) calc(100% - var(--caption-line) + 2px),
+    rgba(0, 0, 0, 0.16) 100%
   );
 }
 .status-caption {
