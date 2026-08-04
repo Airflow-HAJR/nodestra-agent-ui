@@ -20,9 +20,16 @@ export function useTypewriter(target: string, msPerChar = 22): string {
       return
     }
 
+    // Not an extension of what's shown — the source revised itself rather than
+    // adding to it (a live transcript being corrected, or replaced outright by
+    // the final one). Snap to the new text instead of retyping from empty:
+    // re-animating a correction reads as a glitch, and it would leave the
+    // caption lagging behind the words that just went into the conversation.
     if (!target.startsWith(displayedRef.current)) {
-      displayedRef.current = ''
-      setDisplayed('')
+      if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
+      displayedRef.current = target
+      setDisplayed(target)
+      return
     }
 
     if (intervalRef.current) return

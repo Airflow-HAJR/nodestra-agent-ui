@@ -95,7 +95,9 @@ export interface CheckpointResolved {
 // WebSocket message types — inbound from server
 export type ServerMessage =
   | { type: 'transcript'; text: string; role: 'user' | 'agent' }
-  | { type: 'partial_transcript'; text: string; final: boolean }
+  // seq identifies the utterance this result belongs to — see the hook's
+  // partial_transcript handling for why late results have to be droppable.
+  | { type: 'partial_transcript'; text: string; final: boolean; seq?: number }
   | { type: 'audio'; data: string; format: 'mp3' | 'wav' | 'ogg' }
   | { type: 'status'; state: AgentState; label?: string }
   | { type: 'error'; message: string }

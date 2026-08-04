@@ -268,6 +268,12 @@ export function App() {
   const latest    = msgs[msgs.length - 1]
   const penult    = msgs.length >= 2 ? msgs[msgs.length - 2] : null
 
+  // The user's own words under the orb. This is the same string the hook puts
+  // into the conversation — it's replaced in place by the server's final
+  // transcript when the utterance closes, and cleared when the reply arrives,
+  // so the caption is never a stale interim guess that disagrees with history.
+  // (It used to be frozen at whatever the typewriter had revealed the instant
+  // listening ended, which lopped the last few words off every turn.)
   const typedPartialTranscript = useTypewriter(agent.partialTranscript, 22)
 
   // The caption box has a fixed top edge (pinned under the orb) and a fixed
@@ -290,25 +296,6 @@ export function App() {
     window.addEventListener('resize', measureCaption)
     return () => window.removeEventListener('resize', measureCaption)
   }, [measureCaption])
-
-  // Keep the user's last-heard words on screen for a couple seconds after
-  // silence is detected, instead of snapping straight to "Thinking…".
-  const [heldTranscript, setHeldTranscript] = useState('')
-  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  useEffect(() => {
-    if (isListening) {
-      if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null }
-      if (typedPartialTranscript) setHeldTranscript(typedPartialTranscript)
-      return
-    }
-    if (heldTranscript && !holdTimerRef.current) {
-      holdTimerRef.current = setTimeout(() => {
-        setHeldTranscript('')
-        holdTimerRef.current = null
-      }, 2000)
-    }
-  }, [isListening, typedPartialTranscript, heldTranscript])
-  useEffect(() => () => { if (holdTimerRef.current) clearTimeout(holdTimerRef.current) }, [])
 
   // Google Maps embed URL — passive "my location" view (only rendered inside the map sheet)
   const mapsUrl = geo.latitude !== null
@@ -413,9 +400,9 @@ export function App() {
                 {agent.streamingText}
                 {agent.isStreaming && <span className="speaking-cursor" />}
               </div>
-            ) : heldTranscript ? (
+            ) : typedPartialTranscript ? (
               <div className="partial-caption">
-                {heldTranscript}
+                {typedPartialTranscript}
                 {isListening && <span className="speaking-cursor" />}
               </div>
             ) : statusCaption ? (

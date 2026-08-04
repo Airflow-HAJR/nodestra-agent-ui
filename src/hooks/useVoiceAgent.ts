@@ -9,6 +9,11 @@ import {
 // Listening-start/stop chime volume — cut 60% from the source file's level.
 const CHIME_GAIN = 0.4
 
+// Shortest gap between two attempts to rebuild a mic that reported itself
+// dead. Long enough that a hopeless mic retries quietly in the background,
+// short enough that a transient glitch is recovered before the user notices.
+const MIC_RECOVERY_COOLDOWN_MS = 3000
+
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -74,6 +79,9 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
   // Auto mode: what the server last heard. Null until someone speaks.
   const [detectedLanguage, setDetectedLanguage] = useState<string | null>(null)
   const [agentOutputLevel, setAgentOutputLevel] = useState(0)
+  // Bumped after a stalled mic has been torn down, purely to re-run the
+  // keep-the-mic-open effect below once the hardware is free again.
+  const [micRestartTick, setMicRestartTick] = useState(0)
 
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectAttemptsRef = useRef(0)
@@ -90,6 +98,8 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
   const streamIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const listeningStartInFlightRef = useRef(false)
   const micGrantedRef = useRef(false)
+  const micStallRecoveryRef = useRef(false)
+  const lastMicRecoveryRef = useRef(0)
 
   // Analyser sits inline in the *playback* graph (source -> analyser ->
   // destination) so the orb can pulse its radius to the agent's own voice,
@@ -108,6 +118,10 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
   // detected in the current mic-open session (see handleSpeechStart below).
   const isForwardingRef = useRef(false)
   const chunkChainRef = useRef<Promise<void>>(Promise.resolve())
+  // Whether incoming partial transcripts still belong to an utterance the user
+  // is in the middle of. Opened by handleSpeechStart, closed by the final
+  // transcript — see the partial_transcript case above.
+  const acceptPartialsRef = useRef(false)
 
   // Pending agent text (arrives before audio)
   const pendingAgentTextRef = useRef<string | null>(null)
@@ -126,6 +140,11 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
   useEffect(() => { messagesRef.current = messages }, [messages])
 
   const recorder = useAudioRecorder()
+  // The recorder hands back a fresh wrapper object on every render, and it
+  // re-renders on every animation frame (audioLevel). Depending on the object
+  // would rebuild every callback below at 60fps and re-fire the keep-the-mic-
+  // open effect just as often; its methods are stable, so depend on those.
+  const { start: startRecorder, stop: stopRecorder } = recorder
   const stopListeningRef = useRef<(() => Promise<void>) | null>(null)
 
   // ─── Audio unlock ───────────────────────────────────────────────────
@@ -455,7 +474,14 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
           switch (msg.type) {
             case 'transcript':
               if (msg.role === 'user') {
-                setPartialTranscript('')
+                // The words that go into the conversation are also the words
+                // left under the orb — the caption isn't cleared here, it's
+                // overwritten with this exact text. Anything the interim
+                // hypothesis had guessed differently is corrected on screen at
+                // the same instant it's committed to history, so the two can
+                // never show the user two different sentences.
+                setPartialTranscript(msg.text)
+                acceptPartialsRef.current = false
                 setMessages(prev => [...prev, {
                   id: `${Date.now()}-${Math.random()}`,
                   role: 'user',
@@ -464,20 +490,30 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
                   language: configRef.current.language,
                 }])
               } else {
-                // Buffer agent text — reveal it when audio arrives
+                // Buffer agent text — reveal it when audio arrives. The user's
+                // words stay under the orb right up to this point (through the
+                // whole "thinking" stretch, so they can see what was heard) and
+                // hand over to the reply here.
                 pendingAgentTextRef.current = msg.text
+                setPartialTranscript('')
+                acceptPartialsRef.current = false
               }
               break
             case 'partial_transcript':
-              // Live growing transcript of the user's own speech, before they've
-              // stopped talking. Deepgram's interim hypothesis for the still-open
-              // segment can legitimately get revised (including shrinking) as more
-              // audio arrives — most noticeably right around brief pauses, where
-              // its endpointing logic reconsiders the segment boundary. The
-              // caption should only ever grow during one utterance, so ignore any
-              // update that isn't at least as long as what's already shown;
-              // handleSpeechStart resets this to '' at the start of each new one.
-              setPartialTranscript(prev => (msg.text.length >= prev.length ? msg.text : prev))
+              // Live transcript of the user's own speech. Deepgram revises its
+              // hypothesis as more audio arrives, and the revision is the
+              // better transcript ("in a coffee shop near" → "and a coffee
+              // shop nearby.") — so it's applied verbatim rather than being
+              // filtered for monotonic growth, which used to pin a superseded
+              // guess on screen while the corrected one went into history.
+              //
+              // Staleness is handled by ownership instead: partials are only
+              // accepted between this utterance's speech-start and the final
+              // transcript that closes it. A result that arrives after that —
+              // a late flush from the turn just committed — is dropped.
+              if (!acceptPartialsRef.current) break
+              setPartialTranscript(msg.text)
+              if (msg.final) acceptPartialsRef.current = false
               break
             case 'audio':
               enqueueAudio(msg.data)
@@ -491,6 +527,7 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
               break
             case 'error':
               setPartialTranscript('')
+              acceptPartialsRef.current = false
               setMessages(prev => [...prev, {
                 id: `err-${Date.now()}`,
                 role: 'agent',
@@ -587,9 +624,10 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
   // what makes both continuous listening and mid-speech barge-in possible.
   const handleSpeechStart = useCallback(() => {
     isForwardingRef.current = true
+    acceptPartialsRef.current = true
     if (agentStateRef.current === 'speaking') interrupt()
     setAgentState('listening')
-    setPartialTranscript('') // fresh baseline for this utterance's monotonic-growth guard
+    setPartialTranscript('') // clear the previous turn's words; this one starts blank
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'audio_start', language: configRef.current.language }))
     }
@@ -597,11 +635,14 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
 
   // ─── Mic monitoring / continuous listening ───────────────────────────
   const stopListening = useCallback(async () => {
+    // isForwardingRef is the re-entry guard; the ref below is deliberately not
+    // nulled here. The VAD's onSilence callback dereferences it on every
+    // utterance, and clearing it left the mic with no way to end a turn until
+    // some unrelated render happened to restore it.
     if (!isForwardingRef.current) return
     isForwardingRef.current = false
-    stopListeningRef.current = null
     setAgentState('thinking')
-    try { await recorder.stop() } catch { /* already stopped */ }
+    try { await stopRecorder() } catch { /* already stopped */ }
     // recorder.stop() resolves once the MediaRecorder's 'stop' event fires,
     // but the final chunk's base64-encode-then-send is queued asynchronously
     // on chunkChainRef (see handleChunk) and may not have gone out yet.
@@ -614,30 +655,62 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
     } else {
       setAgentState('idle')
     }
-  }, [recorder])
+  }, [stopRecorder])
 
-  useEffect(() => { stopListeningRef.current = stopListening }, [stopListening])
+  // Kept current on every render, not just when the identity changes — the
+  // recorder holds this indirection for the life of the mic session.
+  useEffect(() => { stopListeningRef.current = stopListening })
+
+  // The mic went dead while still nominally open — an OS/browser-level
+  // failure the page can't prevent, only notice. Rebuild it rather than
+  // leaving the user talking into a mic that stopped listening minutes ago
+  // (which is what made toggling mute look like the fix: it was a rebuild).
+  const handleMicStalled = useCallback(() => {
+    if (micStallRecoveryRef.current) return
+    // A mic that fails the moment it opens (revoked permission, no input
+    // device, the OS handing it to another app) would otherwise restart in a
+    // tight loop. Rate-limit recovery so a persistently broken mic degrades
+    // to periodic retries instead of spinning.
+    const now = Date.now()
+    if (now - lastMicRecoveryRef.current < MIC_RECOVERY_COOLDOWN_MS) return
+    lastMicRecoveryRef.current = now
+    micStallRecoveryRef.current = true
+    console.warn('Microphone stalled — reopening')
+    isForwardingRef.current = false
+    stopRecorder()
+      .catch(() => {})
+      .finally(() => {
+        micStallRecoveryRef.current = false
+        // Re-entry through the keep-open effect below: it already knows
+        // whether we should be listening at all right now (muted? connected?).
+        setAgentState(prev => (prev === 'listening' ? 'idle' : prev))
+        setMicRestartTick(t => t + 1)
+      })
+  }, [stopRecorder])
 
   // Opens the mic and starts VAD monitoring. `silent` keeps the visible state
   // as-is (used to open the mic proactively while the agent is speaking, for
   // barge-in) — otherwise the state flips to 'listening' once the mic is open.
   const startListening = useCallback(async (opts?: { silent?: boolean }) => {
-    if (recorder.isRecording) {
-      if (!opts?.silent) setAgentState('listening')
-      return
-    }
     if (listeningStartInFlightRef.current) return
     listeningStartInFlightRef.current = true
     try {
-      await recorder.start({
+      // start() is safe to call on an already-open mic: it retunes the VAD and
+      // refreshes the callbacks in place. That matters because the mic is
+      // opened in 'bargein' mode under the agent's voice and has to come back
+      // down to 'normal' the moment the agent stops — previously this branch
+      // early-returned, so after the first reply the mic stayed pinned at the
+      // loud barge-in threshold and quiet speech was never heard again.
+      await startRecorder({
         onSpeechStart: handleSpeechStart,
         onSilence: () => { stopListeningRef.current?.() },
         onChunk: handleChunk,
+        onStalled: handleMicStalled,
         // While the agent is talking, the mic can easily pick up its own
         // voice through the speakers (no headphones). Require noticeably
         // louder, sustained audio before treating it as a real interruption
         // — a normal listening turn stays fast/instant-triggered.
-        ...(opts?.silent ? { speechThreshold: 0.18, speechSustainMs: 180 } : {}),
+        mode: opts?.silent ? 'bargein' : 'normal',
       })
 
       if (!micGrantedRef.current) {
@@ -657,46 +730,50 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
     } finally {
       listeningStartInFlightRef.current = false
     }
-  }, [recorder, unlockAudio, playNextAudio, handleSpeechStart, handleChunk])
+  }, [startRecorder, unlockAudio, playNextAudio, handleSpeechStart, handleChunk, handleMicStalled])
 
   // Keep the mic proactively open (and thus VAD-monitored for barge-in)
   // whenever the agent is idle or speaking and the user hasn't muted —
   // this is what turns tap-to-talk into an always-on voice mode.
+  //
+  // 'listening' is included deliberately: the mic being open is what puts us
+  // in that state, but a stall recovery can leave the state and the hardware
+  // out of step, and this is what puts them back together.
   useEffect(() => {
     if (muted) return
     if (connectionState !== 'connected') return
-    if (agentState === 'idle') { startListening(); return }
     if (agentState === 'speaking') { startListening({ silent: true }); return }
-  }, [agentState, connectionState, muted, startListening])
+    if (agentState === 'idle' || agentState === 'listening') { startListening(); return }
+  }, [agentState, connectionState, muted, startListening, micRestartTick])
 
   const toggleMute = useCallback(() => {
     setMuted(prev => {
       const next = !prev
-      if (next && recorder.isRecording) {
+      if (next) {
         isForwardingRef.current = false
+        acceptPartialsRef.current = false
         setPartialTranscript('')
-        recorder.stop().catch(() => {})
+        stopRecorder().catch(() => {})
         if (agentStateRef.current === 'listening') setAgentState('idle')
       }
       return next
     })
-  }, [recorder])
+  }, [stopRecorder])
 
   const sendText = useCallback((text: string) => {
     const trimmed = text.trim()
     if (!trimmed) return
-    if (recorder.isRecording) {
-      isForwardingRef.current = false
-      setPartialTranscript('')
-      recorder.stop().catch(() => {})
-    }
+    isForwardingRef.current = false
+    acceptPartialsRef.current = false
+    setPartialTranscript('')
+    stopRecorder().catch(() => {})
     setAgentState('thinking')
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'text', text: trimmed, language: configRef.current.language }))
     } else {
       setAgentState('idle')
     }
-  }, [recorder])
+  }, [stopRecorder])
 
   const clearMessages = useCallback(() => setMessages([]), [])
   const clearMapAction = useCallback(() => setMapAction(null), [])
