@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { ChevronDown, X, Send, Keyboard, Mic, MicOff, MapPin, MessageSquare, CircleCheckBig } from 'lucide-react'
 import { AgentOrb } from './components/AgentOrb'
 import { LanguageSelector } from './components/LanguageSelector'
 import { MapDirectionsPanel } from './components/MapDirectionsPanel'
@@ -377,9 +378,7 @@ export function App() {
             aria-label={`${S.language}: ${activeLanguageName}. ${S.changeLanguage}`}
           >
             {activeLanguageName}
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
+            <ChevronDown size={11} strokeWidth={2.5} aria-hidden="true" />
           </button>
           {auth.available && auth.ready && (
             /* Positioned container so the callout can hang off the button it's
@@ -421,9 +420,7 @@ export function App() {
               <div className="history-overlay-header">
                 <span className="history-overlay-title">{S.conversation}</span>
                 <button className="history-overlay-close" onClick={() => setHistoryOpen(false)}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <polyline points="6 9 12 15 18 9" />
-                  </svg>
+                  <ChevronDown size={13} strokeWidth={2.5} aria-hidden="true" />
                   {S.back}
                 </button>
               </div>
@@ -516,14 +513,10 @@ export function App() {
               onKeyDown={(e) => { if (e.key === 'Escape') closeTextInput() }}
             />
             <button type="button" className="text-input-close" onClick={closeTextInput} aria-label={S.closeInput}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
+              <X size={16} strokeWidth={2.5} aria-hidden="true" />
             </button>
             <button type="submit" className="text-input-send" disabled={!textValue.trim()} aria-label={S.send}>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M2 21l21-9L2 3v7l15 2-15 2z" />
-              </svg>
+              <Send size={17} strokeWidth={2} aria-hidden="true" />
             </button>
           </form>
         ) : (
@@ -533,11 +526,7 @@ export function App() {
               onClick={(e) => { e.stopPropagation(); openTextInput() }}
               aria-label={S.typeInstead}
             >
-              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="2" y="5" width="20" height="14" rx="2" />
-                <line x1="6" y1="9" x2="6" y2="9" /><line x1="10" y1="9" x2="10" y2="9" /><line x1="14" y1="9" x2="14" y2="9" /><line x1="18" y1="9" x2="18" y2="9" />
-                <line x1="6" y1="13" x2="18" y2="13" />
-              </svg>
+              <Keyboard size={19} strokeWidth={1.8} aria-hidden="true" />
             </button>
 
             <button
@@ -546,20 +535,9 @@ export function App() {
               aria-label={agent.muted ? S.unmuteMic : S.muteMic}
             >
               {agent.muted ? (
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="1" y1="1" x2="23" y2="23" />
-                  <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
-                  <path d="M17 16.95A7 7 0 0 1 5 12v-2M19 10v2a7 7 0 0 1-.11 1.23" />
-                  <line x1="12" y1="19" x2="12" y2="23" />
-                  <line x1="8" y1="23" x2="16" y2="23" />
-                </svg>
+                <MicOff size={24} strokeWidth={1.8} aria-hidden="true" />
               ) : (
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                  <line x1="12" y1="19" x2="12" y2="23" />
-                  <line x1="8" y1="23" x2="16" y2="23" />
-                </svg>
+                <Mic size={24} strokeWidth={1.8} aria-hidden="true" />
               )}
             </button>
 
@@ -568,10 +546,7 @@ export function App() {
               onClick={(e) => { e.stopPropagation(); openMapSheet() }}
               aria-label={S.showMap}
             >
-              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="10" r="3" />
-                <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 14 8 14s8-8.75 8-14a8 8 0 0 0-8-8z" />
-              </svg>
+              <MapPin size={19} strokeWidth={1.8} aria-hidden="true" />
               {agent.mapAction && (agent.mapAction.type === 'show_directions' || agent.mapAction.type === 'show_route' || agent.mapAction.type === 'show_trajectory') && (
                 <span className="nav-map-pulse" aria-hidden="true">
                   <span className="nav-map-pulse__ring" />
@@ -649,9 +624,7 @@ export function App() {
                 className="settings-action-btn"
                 onClick={() => { setOverflowOpen(false); setIsSmsOpen(true); setSmsSent(false) }}
               >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                </svg>
+                <MessageSquare size={15} strokeWidth={2} aria-hidden="true" />
                 {S.textMeInstead}
               </button>
             </div>
@@ -667,10 +640,7 @@ export function App() {
             <div className="sheet-title">{S.smsTitle}</div>
             {smsSent ? (
               <div className="sms-success">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                  <polyline points="22 4 12 14.01 9 11.01" />
-                </svg>
+                <CircleCheckBig size={40} strokeWidth={2} color="#22c55e" aria-hidden="true" />
                 <p>{S.smsSuccess}</p>
                 {TWILIO_NUMBER && (
                   <p className="sms-number">{S.smsOr} <strong>{TWILIO_NUMBER}</strong></p>

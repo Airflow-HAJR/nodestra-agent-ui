@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Navigation, MapPin, Maximize2, Minimize2, X } from 'lucide-react'
 import type { MapActionPayload } from '../lib/types'
 import { GOOGLE_MAPS_API_KEY } from '../lib/constants'
 import { strings } from '../lib/i18n'
@@ -315,37 +316,20 @@ function MapHeader({
     <div className="map-directions-header">
       <div className="map-directions-label">
         {isDirections ? (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <polygon points="3 11 22 2 13 21 11 13 3 11" />
-          </svg>
+          <Navigation size={14} strokeWidth={2} aria-hidden="true" />
         ) : (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <circle cx="12" cy="10" r="3" />
-            <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 14 8 14s8-8.75 8-14a8 8 0 0 0-8-8z" />
-          </svg>
+          <MapPin size={14} strokeWidth={2} aria-hidden="true" />
         )}
         <span>{isDirections ? `${S.directionsTo} ` : ''}<strong>{destinationName}</strong></span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
         <button className="map-directions-dismiss" onClick={onExpand} aria-label={expanded ? S.collapseMap : S.expandMap}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            {expanded ? (
-              <>
-                <polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" />
-                <line x1="10" y1="14" x2="3" y2="21" /><line x1="21" y1="3" x2="14" y2="10" />
-              </>
-            ) : (
-              <>
-                <polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" />
-                <line x1="21" y1="3" x2="14" y2="10" /><line x1="3" y1="21" x2="10" y2="14" />
-              </>
-            )}
-          </svg>
+          {expanded
+            ? <Minimize2 size={14} strokeWidth={2.5} aria-hidden="true" />
+            : <Maximize2 size={14} strokeWidth={2.5} aria-hidden="true" />}
         </button>
         <button className="map-directions-dismiss" onClick={onDismiss} aria-label={S.dismissMap}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
+          <X size={14} strokeWidth={2.5} aria-hidden="true" />
         </button>
       </div>
     </div>

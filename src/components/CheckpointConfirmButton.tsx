@@ -1,3 +1,4 @@
+import { Check, CircleHelp } from 'lucide-react'
 import type { CheckpointPrompt } from '../lib/types'
 import { strings } from '../lib/i18n'
 
@@ -29,18 +30,12 @@ export function CheckpointConfirmButton({ prompt, visible, uiLang, onConfirm, on
         onClick={onConfirm}
         title={`${S.madeItTo} ${prompt.poiName}`}
       >
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <polyline points="20 6 9 17 4 12" />
-        </svg>
+        <Check size={15} strokeWidth={2.5} aria-hidden="true" />
         <span className="checkpoint-pill__prefix">{S.madeItTo}</span>
         <span className="checkpoint-pill__poi">{prompt.poiName}</span>
       </button>
       <button className="checkpoint-pill checkpoint-pill--help" onClick={onNeedHelp}>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="9" />
-          <path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2 2-2.5 3" />
-          <circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none" />
-        </svg>
+        <CircleHelp size={15} strokeWidth={2.5} aria-hidden="true" />
         {S.needHelp}
       </button>
     </div>

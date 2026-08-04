@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { X } from 'lucide-react'
 import { GoogleMark } from './GoogleMark'
 import { API_BASE_URL } from '../lib/constants'
 import { strings } from '../lib/i18n'
@@ -135,9 +136,7 @@ export function AccountSheet({ auth, uiLang, memoryPersisted, onClose }: Props) 
                       onClick={() => forget(fact)}
                       aria-label={`${S.forget}: ${fact.content}`}
                     >
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
+                      <X size={13} strokeWidth={2.5} aria-hidden="true" />
                     </button>
                   </li>
                 ))}
