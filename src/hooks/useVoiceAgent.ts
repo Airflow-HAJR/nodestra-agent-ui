@@ -62,6 +62,7 @@ export interface VoiceAgentHook {
   confirmCheckpoint: () => void
   requestCheckpointHelp: () => void
   detectedLanguage: string | null   // auto mode: what the server last heard
+  memoryPersisted: boolean | null   // server's verdict: is this session's memory durable?
   changeLanguage: (lang: string) => void
 }
 
@@ -78,6 +79,9 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
   const [muted, setMuted] = useState(false)
   // Auto mode: what the server last heard. Null until someone speaks.
   const [detectedLanguage, setDetectedLanguage] = useState<string | null>(null)
+  // Whether the SERVER accepted our access token — i.e. whether anything said
+  // this session will actually be remembered. Null until it has told us.
+  const [memoryPersisted, setMemoryPersisted] = useState<boolean | null>(null)
   const [agentOutputLevel, setAgentOutputLevel] = useState(0)
   // Bumped after a stalled mic has been torn down, purely to re-run the
   // keep-the-mic-open effect below once the hardware is free again.
@@ -429,6 +433,23 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
   }, [stopPlayback])
 
   // ─── WebSocket ──────────────────────────────────────────────────────
+  // Whether this connection has been told who it's talking to yet. Reset on
+  // every open, because a reconnect starts a fresh server-side session.
+  const configSentRef = useRef(false)
+
+  const sendConfig = useCallback((greet: boolean): boolean => {
+    const ws = wsRef.current
+    if (ws?.readyState !== WebSocket.OPEN) return false
+    ws.send(JSON.stringify({
+      type: 'config',
+      language: configRef.current.language,
+      userId: configRef.current.userId,
+      accessToken: configRef.current.accessToken ?? null,
+      greet,
+    }))
+    return true
+  }, [])
+
   const scheduleReconnect = useCallback(() => {
     if (!isMountedRef.current) return
     if (reconnectAttemptsRef.current >= RECONNECT_MAX_ATTEMPTS) {
@@ -457,14 +478,17 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
         reconnectAttemptsRef.current = 0
         setConnectionState('connected')
         setAgentState('idle')
-        // Only greet on a genuinely fresh session — this also fires on every
-        // reconnect, and re-greeting there talks over an ongoing conversation.
-        ws.send(JSON.stringify({
-          type: 'config',
-          language: configRef.current.language,
-          userId: configRef.current.userId,
-          greet: messagesRef.current.length === 0,
-        }))
+        // Held back until we know who this is. A stored session is read from
+        // disk asynchronously, and configuring the socket before that resolves
+        // would have the server greet a returning, signed-in traveler as a
+        // stranger. The identity effect below sends it the moment auth settles.
+        configSentRef.current = false
+        if (configRef.current.authReady !== false) {
+          // Only greet on a genuinely fresh session — onopen also fires on
+          // every reconnect, and re-greeting there talks over an ongoing
+          // conversation.
+          configSentRef.current = sendConfig(messagesRef.current.length === 0)
+        }
       }
 
       ws.onmessage = (event: MessageEvent) => {
@@ -563,6 +587,9 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
             case 'language_detected':
               setDetectedLanguage(msg.language)
               break
+            case 'account':
+              setMemoryPersisted(msg.signedIn)
+              break
           }
         } catch { /* ignore malformed */ }
       }
@@ -578,7 +605,7 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
       setConnectionState('disconnected')
       scheduleReconnect()
     }
-  }, [enqueueAudio, scheduleReconnect])
+  }, [enqueueAudio, scheduleReconnect, sendConfig])
 
   useEffect(() => {
     isMountedRef.current = true
@@ -593,16 +620,27 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
     }
   }, [connect, clearStream, stopOutputLevelMonitor])
 
-  // userId only. Language changes go through changeLanguage(), which also has
+  // Identity only. Language changes go through changeLanguage(), which also has
   // to stop playback and retranslate the transcript — re-sending config here
   // would race that with a second, dumber switch.
+  //
+  // This is what makes signing in mid-conversation seamless: the socket, the
+  // transcript, and whatever the agent is in the middle of all stay put, and
+  // the server simply re-resolves who it's talking to and loads their saved
+  // preferences. It also covers the first config of a connection when auth was
+  // still resolving at the time the socket opened — hence greeting here, but
+  // only when this is genuinely the opening exchange.
+  const identityKey = `${config.userId ?? ''}|${config.accessToken ?? ''}`
+  const lastIdentityRef = useRef(identityKey)
   useEffect(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({
-        type: 'config', language: configRef.current.language, userId: config.userId, greet: false,
-      }))
+    if (config.authReady === false) return
+    if (configSentRef.current && lastIdentityRef.current === identityKey) return
+    const isFirstForThisConnection = !configSentRef.current
+    if (sendConfig(isFirstForThisConnection && messagesRef.current.length === 0)) {
+      configSentRef.current = true
+      lastIdentityRef.current = identityKey
     }
-  }, [config.userId])
+  }, [identityKey, config.authReady, sendConfig])
 
   // ─── Live-streamed chunk forwarding ───────────────────────────────────
   // The recorder only ever hands us chunks once real speech has been detected
@@ -823,6 +861,6 @@ export function useVoiceAgent(config: VoiceAgentConfig): VoiceAgentHook {
     muted, toggleMute, interrupt, sendText,
     startListening, stopListening, clearMessages, unlockAudio,
     sendLocation,
-    detectedLanguage, changeLanguage,
+    detectedLanguage, memoryPersisted, changeLanguage,
   }
 }

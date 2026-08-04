@@ -212,7 +212,7 @@ function MapCanvas({ action, userLat, userLng, uiLang }: { action: MapActionPayl
           addUserDot(origin)
           // The origin here is the user's own position, not a place — name it
           // as such rather than leaving the only unlabelled pin on the map.
-          addLabel(origin, S.yourLocation, 'endpoint')
+          addLabel(origin, S.you, 'endpoint')
           drawRoute([origin, action.destination])
           map.fitBounds(bounds, LABEL_PADDING)
         } else {
@@ -276,9 +276,11 @@ function MapCanvas({ action, userLat, userLng, uiLang }: { action: MapActionPayl
           })
 
           // Where the leg starts and where it ends, named at all times. On the
-          // first segment that start is the user's own position, so the route's
-          // origin POI names it; on the last, the end is the destination.
-          addLabel(firstStop, originIsUser ? action.origin.name : firstStop.name, 'endpoint')
+          // first segment that start is the user's own position — the chip says
+          // "You", not the POI the router happened to snap them to, which read
+          // as a place they still had to walk to. On the last, the end is the
+          // destination.
+          addLabel(firstStop, originIsUser ? S.you : firstStop.name, 'endpoint')
           addLabel(lastStop, isFinalSegment ? action.destination.name : lastStop.name, 'endpoint')
 
           drawRoute(seg.stops)

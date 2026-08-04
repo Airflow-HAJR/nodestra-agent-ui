@@ -27,6 +27,14 @@ export const USER_ID_STORAGE_KEY = 'nodestra_user_id'
 export const WS_URL = import.meta.env['VITE_WS_URL'] as string | undefined
   ?? 'ws://localhost:8000/web/stream'
 
+// The same server as the websocket, over http — the REST endpoints (/sms-invite,
+// /account/*) live alongside /web/stream, so there's only ever one URL to
+// configure.
+export const API_BASE_URL = WS_URL
+  .replace(/^ws:/, 'http:')
+  .replace(/^wss:/, 'https:')
+  .replace(/\/web\/stream$/, '')
+
 export const GOOGLE_MAPS_API_KEY = import.meta.env['VITE_GOOGLE_MAPS_API_KEY'] as string | undefined
   ?? ''
 

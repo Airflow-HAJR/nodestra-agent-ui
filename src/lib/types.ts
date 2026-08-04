@@ -21,6 +21,13 @@ export interface VoiceAgentConfig {
   serverUrl: string
   language: string
   userId?: string
+  // Supabase access token when the user is signed in. Absent for guests, who
+  // get the identical experience minus anything being remembered afterwards.
+  accessToken?: string | null
+  // False while a stored session is still being read off disk. The socket
+  // holds its opening config until this is true so a returning user is greeted
+  // as themselves rather than as a stranger.
+  authReady?: boolean
 }
 
 export interface GeolocationState {
@@ -106,6 +113,10 @@ export type ServerMessage =
   | ({ type: 'checkpoint_resolved' } & CheckpointResolved)
   // Auto mode only: what Deepgram actually heard, so the UI can follow along.
   | { type: 'language_detected'; language: string }
+  // The server's verdict on the access token we sent. The browser can believe
+  // it's signed in while the server disagrees (expired token, auth API down) —
+  // this is what the UI trusts when claiming preferences are being saved.
+  | { type: 'account'; signedIn: boolean; name: string | null; email: string | null }
 
 // WebSocket message types — outbound to server
 export type ClientMessage =
@@ -114,7 +125,7 @@ export type ClientMessage =
   | { type: 'audio_chunk'; data: string }
   | { type: 'audio_end' }
   | { type: 'text'; text: string; language: string }
-  | { type: 'config'; language: string; userId?: string; greet?: boolean }
+  | { type: 'config'; language: string; userId?: string; accessToken?: string | null; greet?: boolean }
   // resume: a reply was mid-playback, so regenerate it in the new language.
   | { type: 'set_language'; language: string; resume: boolean }
   | { type: 'ping' }

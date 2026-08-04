@@ -3,10 +3,13 @@ import { AgentOrb } from './components/AgentOrb'
 import { LanguageSelector } from './components/LanguageSelector'
 import { MapDirectionsPanel } from './components/MapDirectionsPanel'
 import { CheckpointConfirmButton } from './components/CheckpointConfirmButton'
+import { AccountButton } from './components/AccountButton'
+import { AccountSheet } from './components/AccountSheet'
 import { useVoiceAgent } from './hooks/useVoiceAgent'
+import { useAuth } from './hooks/useAuth'
 import { useGeolocation } from './hooks/useGeolocation'
 import { useTypewriter } from './hooks/useTypewriter'
-import { LANGUAGES, AUTO_LANGUAGE, DEFAULT_LANGUAGE, LANGUAGE_STORAGE_KEY, USER_ID_STORAGE_KEY, WS_URL, generateUserId, GOOGLE_MAPS_API_KEY, AGENT_AVATAR_URL } from './lib/constants'
+import { LANGUAGES, AUTO_LANGUAGE, DEFAULT_LANGUAGE, LANGUAGE_STORAGE_KEY, API_BASE_URL, WS_URL, GOOGLE_MAPS_API_KEY, AGENT_AVATAR_URL } from './lib/constants'
 import { uiLanguage, strings, RTL_LANGUAGES } from './lib/i18n'
 import { haversineMeters } from './lib/geo'
 import type { Language } from './lib/types'
@@ -19,20 +22,10 @@ const MAP_COLLAPSE_ANIM_MS = 500
 function getStoredLanguage(): string {
   try { return localStorage.getItem(LANGUAGE_STORAGE_KEY) ?? DEFAULT_LANGUAGE } catch { return DEFAULT_LANGUAGE }
 }
-function getOrCreateUserId(): string {
-  try {
-    const s = localStorage.getItem(USER_ID_STORAGE_KEY)
-    if (s) return s
-    const id = generateUserId()
-    localStorage.setItem(USER_ID_STORAGE_KEY, id)
-    return id
-  } catch { return generateUserId() }
-}
-
 export function App() {
   const [language, setLanguage]   = useState(getStoredLanguage)
-  const [userId]                  = useState(getOrCreateUserId)
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [accountOpen, setAccountOpen] = useState(false)
   const [overflowOpen, setOverflowOpen] = useState(false)
   const [isSmsOpen, setIsSmsOpen]     = useState(false)
   const [mapSheetOpen, setMapSheetOpen] = useState(false)
@@ -43,7 +36,17 @@ export function App() {
   const [smsSent, setSmsSent]     = useState(false)
 
   const geo   = useGeolocation()
-  const agent = useVoiceAgent({ serverUrl: WS_URL, language, userId })
+  // Identity comes from the auth hook whether or not anyone has signed in: it
+  // hands back the account when there is one and the per-device guest id when
+  // there isn't, so the agent always has something stable to key memory to.
+  const auth  = useAuth()
+  const agent = useVoiceAgent({
+    serverUrl: WS_URL,
+    language,
+    userId: auth.userId,
+    accessToken: auth.accessToken,
+    authReady: auth.ready,
+  })
 
   // Under auto the chrome follows whatever the server last heard, so the whole
   // page moves to the traveler's language without them touching the pill.
@@ -195,7 +198,7 @@ export function App() {
     const cleaned = smsPhone.replace(/\D/g, '')
     const e164 = cleaned.startsWith('1') ? `+${cleaned}` : `+1${cleaned}`
     try {
-      await fetch(`${WS_URL.replace('ws://', 'http://').replace('wss://', 'https://').replace('/web/stream', '')}/sms-invite`, {
+      await fetch(`${API_BASE_URL}/sms-invite`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ to: e164 }),
@@ -329,6 +332,13 @@ export function App() {
               <polyline points="6 9 12 15 18 9" />
             </svg>
           </button>
+          {auth.available && auth.ready && (
+            <AccountButton
+              account={auth.account}
+              label={auth.account ? `${S.account}: ${auth.account.name ?? auth.account.email ?? ''}` : S.signIn}
+              onClick={() => setAccountOpen(true)}
+            />
+          )}
         </div>
       </header>
 
@@ -545,6 +555,16 @@ export function App() {
             )}
           </div>
         </div>
+      )}
+
+      {/* ── Account sheet ── */}
+      {accountOpen && (
+        <AccountSheet
+          auth={auth}
+          uiLang={uiLang}
+          memoryPersisted={agent.memoryPersisted}
+          onClose={() => setAccountOpen(false)}
+        />
       )}
 
       {/* ── Overflow / settings sheet ── */}
