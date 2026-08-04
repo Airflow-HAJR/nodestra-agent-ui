@@ -725,6 +725,55 @@ body {
   white-space: nowrap;
 }
 
+/* Name chips floating above route pins (see PoiLabel in MapDirectionsPanel).
+   Positioned by the map projection at the pin's own point, then lifted clear
+   of the circle by the translate below. */
+.map-poi-label {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 20px));
+  max-width: 132px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.96);
+  color: #202124;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.22);
+}
+
+/* A little tail so a chip reads as belonging to the pin under it rather than
+   floating free — matters when stops sit close together. */
+.map-poi-label::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  width: 8px;
+  height: 8px;
+  transform: translateX(-50%) rotate(45deg);
+  background: inherit;
+  border-right: 1px solid rgba(0, 0, 0, 0.1);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* The stop being walked to right now — matches its purple pin. */
+.map-poi-label--active {
+  /* Lifted clear of the endpoint chips: stops sit close together indoors, and
+     at the same height two chips just overlap each other. */
+  transform: translate(-50%, calc(-100% - 34px));
+  background: #9C27B0;
+  color: #fff;
+  border-color: rgba(0, 0, 0, 0.12);
+  font-weight: 700;
+  z-index: 1;
+}
+
 .map-expand-backdrop {
   position: fixed;
   inset: 0;
