@@ -400,6 +400,12 @@ export function App() {
                 {agent.streamingText}
                 {agent.isStreaming && <span className="speaking-cursor" />}
               </div>
+            ) : isThinking ? (
+              // What the agent is doing wins over what the user said. Once the
+              // turn is handed off, "Charting course…" is the useful thing on
+              // screen — the words that were heard have already been confirmed
+              // during listening and are a scroll away in the history.
+              <div className="status-caption">{statusCaption}</div>
             ) : typedPartialTranscript ? (
               <div className="partial-caption">
                 {typedPartialTranscript}
