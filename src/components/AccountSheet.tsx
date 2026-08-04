@@ -166,7 +166,6 @@ export function AccountSheet({ auth, uiLang, memoryPersisted, onClose }: Props) 
               {signingIn ? S.loadingAccount : S.continueWithGoogle}
             </button>
             {auth.error && <p className="account-error">{S.signInFailed}</p>}
-            <p className="account-note account-note--quiet">{S.sessionOnlyNote}</p>
           </>
         )}
       </div>

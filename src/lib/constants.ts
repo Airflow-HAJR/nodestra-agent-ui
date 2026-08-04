@@ -23,6 +23,26 @@ export const LANGUAGES: Language[] = [
 export const DEFAULT_LANGUAGE = 'en'
 export const LANGUAGE_STORAGE_KEY = 'nodestra_language'
 export const USER_ID_STORAGE_KEY = 'nodestra_user_id'
+// When the sign-in callout was last answered, either way (epoch millis). A
+// timestamp rather than a flag because the offer is per-trip, not per-device:
+// see SIGNIN_NUDGE_REARM_MS.
+export const SIGNIN_NUDGE_STORAGE_KEY = 'nodestra_signin_nudge_last'
+
+/** How long the app waits before offering the account. Long enough that the
+ *  greeting has been said and the traveler has looked at the orb rather than a
+ *  popup — the first thing this app does should never be to ask for something. */
+export const SIGNIN_NUDGE_DELAY_MS = 6000
+
+/** How long a "not now" holds before the offer comes back.
+ *
+ *  This app is used in bursts: someone picks it up on their way through a
+ *  terminal and puts it down at the gate, then not again until their next trip.
+ *  Asking once per device would mean most travelers only ever see the offer on
+ *  a trip where they happened to be in a hurry; asking every load would be
+ *  nagging. Twelve hours splits those cleanly — longer than any walk through an
+ *  airport, so it cannot fire twice in one visit, and shorter than the gap
+ *  between an outbound and a return leg, so each trip gets its own ask. */
+export const SIGNIN_NUDGE_REARM_MS = 12 * 60 * 60 * 1000
 
 export const WS_URL = import.meta.env['VITE_WS_URL'] as string | undefined
   ?? 'ws://localhost:8000/web/stream'

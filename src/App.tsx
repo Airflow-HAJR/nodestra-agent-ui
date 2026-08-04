@@ -5,11 +5,12 @@ import { MapDirectionsPanel } from './components/MapDirectionsPanel'
 import { CheckpointConfirmButton } from './components/CheckpointConfirmButton'
 import { AccountButton } from './components/AccountButton'
 import { AccountSheet } from './components/AccountSheet'
+import { SignInNudge } from './components/SignInNudge'
 import { useVoiceAgent } from './hooks/useVoiceAgent'
 import { useAuth } from './hooks/useAuth'
 import { useGeolocation } from './hooks/useGeolocation'
 import { useTypewriter } from './hooks/useTypewriter'
-import { LANGUAGES, AUTO_LANGUAGE, DEFAULT_LANGUAGE, LANGUAGE_STORAGE_KEY, API_BASE_URL, WS_URL, GOOGLE_MAPS_API_KEY, AGENT_AVATAR_URL } from './lib/constants'
+import { LANGUAGES, AUTO_LANGUAGE, DEFAULT_LANGUAGE, LANGUAGE_STORAGE_KEY, API_BASE_URL, WS_URL, GOOGLE_MAPS_API_KEY, AGENT_AVATAR_URL, SIGNIN_NUDGE_STORAGE_KEY, SIGNIN_NUDGE_DELAY_MS, SIGNIN_NUDGE_REARM_MS } from './lib/constants'
 import { uiLanguage, strings, RTL_LANGUAGES } from './lib/i18n'
 import { haversineMeters } from './lib/geo'
 import type { Language } from './lib/types'
@@ -22,10 +23,34 @@ const MAP_COLLAPSE_ANIM_MS = 500
 function getStoredLanguage(): string {
   try { return localStorage.getItem(LANGUAGE_STORAGE_KEY) ?? DEFAULT_LANGUAGE } catch { return DEFAULT_LANGUAGE }
 }
+
+/** Whether this visit is allowed to make the sign-in offer. */
+function signInNudgeArmed(): boolean {
+  try {
+    const raw = localStorage.getItem(SIGNIN_NUDGE_STORAGE_KEY)
+    if (raw === null) return true              // never asked on this device
+    const elapsed = Date.now() - Number(raw)
+    // NaN from a corrupt or hand-edited value, and a negative gap from a clock
+    // that moved backwards, both mean the record can't be trusted — and an
+    // untrustworthy record shouldn't be able to silence the offer forever.
+    if (!Number.isFinite(elapsed) || elapsed < 0) return true
+    return elapsed > SIGNIN_NUDGE_REARM_MS
+  } catch {
+    // A browser that refuses storage (private mode) can't remember a "not now",
+    // so it would ask on every single load. Failing to remember the answer is a
+    // reason to ask less, not more.
+    return false
+  }
+}
 export function App() {
   const [language, setLanguage]   = useState(getStoredLanguage)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
+  const [nudgeOpen, setNudgeOpen] = useState(false)
+  // Read once per mount. Within a single visit the answer never changes, and a
+  // ref (not state) is what keeps a re-render from re-offering something the
+  // traveler already waved off.
+  const nudgeSpentRef = useRef(!signInNudgeArmed())
   const [overflowOpen, setOverflowOpen] = useState(false)
   const [isSmsOpen, setIsSmsOpen]     = useState(false)
   const [mapSheetOpen, setMapSheetOpen] = useState(false)
@@ -56,6 +81,30 @@ export function App() {
 
   // Auto-request location on mount — triggers the browser's native permission popup
   useEffect(() => { geo.requestLocation() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── The sign-in offer ──
+  // The account button is a 26px outline in the header: correct for something
+  // optional, but it never tells anyone what it's for, so nobody signs in and
+  // every traveler starts from scratch. Once a trip this says it out loud — an
+  // account is what makes the agent's memory survive the terminal — and then
+  // stamps the time, whichever way it was answered, so it stays quiet for the
+  // rest of this visit and comes back on the next one.
+  const closeNudge = useCallback(() => {
+    nudgeSpentRef.current = true
+    setNudgeOpen(false)
+    try { localStorage.setItem(SIGNIN_NUDGE_STORAGE_KEY, String(Date.now())) } catch { /* asked anyway */ }
+  }, [])
+
+  useEffect(() => {
+    if (!auth.available || !auth.ready) return
+    // `ready` above is what keeps this honest: until the stored session has been
+    // read, `account` is null for everyone, and pitching an account to someone
+    // who already has one is the one mistake this can't make.
+    if (auth.account) { closeNudge(); return }
+    if (nudgeSpentRef.current) return
+    const timer = setTimeout(() => setNudgeOpen(true), SIGNIN_NUDGE_DELAY_MS)
+    return () => clearTimeout(timer)
+  }, [auth.available, auth.ready, auth.account, closeNudge])
 
   const hasUnlockedRef   = useRef(false)
   const historyScrollRef = useRef<HTMLDivElement>(null)
@@ -333,11 +382,22 @@ export function App() {
             </svg>
           </button>
           {auth.available && auth.ready && (
-            <AccountButton
-              account={auth.account}
-              label={auth.account ? `${S.account}: ${auth.account.name ?? auth.account.email ?? ''}` : S.signIn}
-              onClick={() => setAccountOpen(true)}
-            />
+            /* Positioned container so the callout can hang off the button it's
+               pointing at, rather than being placed against the viewport. */
+            <div className="header-account">
+              <AccountButton
+                account={auth.account}
+                label={auth.account ? `${S.account}: ${auth.account.name ?? auth.account.email ?? ''}` : S.signIn}
+                onClick={() => { closeNudge(); setAccountOpen(true) }}
+              />
+              {nudgeOpen && !accountOpen && !overflowOpen && !isSmsOpen && !historyOpen && (
+                <SignInNudge
+                  uiLang={uiLang}
+                  onSignIn={() => { closeNudge(); setAccountOpen(true) }}
+                  onDismiss={closeNudge}
+                />
+              )}
+            </div>
           )}
         </div>
       </header>

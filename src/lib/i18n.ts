@@ -50,7 +50,6 @@ export interface UIStrings {
   guest: string
   accountWhy: string
   accountSavedNote: string
-  sessionOnlyNote: string
   whatIRemember: string
   nothingRemembered: string
   forget: string
@@ -59,6 +58,9 @@ export interface UIStrings {
   notSyncing: string
   signInFailed: string
   loadingAccount: string
+  nudgeTitle: string
+  nudgeBody: string
+  notNow: string
 }
 
 export const UI_STRINGS: Record<string, UIStrings> = {
@@ -103,9 +105,8 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     continueWithGoogle: 'Continue with Google',
     signOut: 'Sign out',
     guest: 'Guest',
-    accountWhy: 'Sign in and I\'ll remember your preferences for next time — your diet, how you get around, the airline you fly. Everything here works without one.',
+    accountWhy: "Connect your Google account and I'll remember your preferences for your every airport visit. Your diet, lounge preferences, even your favorite pizza toppings, you name it!",
     accountSavedNote: 'Saved to your account. I\'ll still know this the next time you\'re here.',
-    sessionOnlyNote: 'I\'ll remember this while we talk, then let it go. Sign in to keep it.',
     whatIRemember: 'What I remember',
     nothingRemembered: 'Nothing yet. Just tell me — “I\'m vegetarian”, “I use a wheelchair” — and I\'ll hold on to it.',
     forget: 'Forget',
@@ -114,6 +115,9 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     notSyncing: 'Not reaching your account right now — nothing new is being saved.',
     signInFailed: 'Sign-in didn\'t go through. Please try again.',
     loadingAccount: 'Loading…',
+    nudgeTitle: 'Save your preferences',
+    nudgeBody: "Connect your Google account and I'll remember your preferences for your every airport visit. Your diet, lounge preferences, even your favorite pizza toppings, you name it!",
+    notNow: 'Not now',
   },
   es: {
     appTitle: 'Aeropuerto Internacional de Oakland',
@@ -156,9 +160,8 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     continueWithGoogle: 'Continuar con Google',
     signOut: 'Cerrar sesión',
     guest: 'Invitado',
-    accountWhy: 'Inicia sesión y recordaré tus preferencias para la próxima vez: tu dieta, cómo te desplazas, la aerolínea con la que vuelas. Todo funciona igual sin cuenta.',
+    accountWhy: "Conecta tu cuenta de Google y recordaré tus preferencias en cada visita al aeropuerto. Tu dieta, las salas VIP que prefieres, hasta los ingredientes de tu pizza favorita. ¡Lo que se te ocurra!",
     accountSavedNote: 'Guardado en tu cuenta. Lo seguiré sabiendo la próxima vez que vengas.',
-    sessionOnlyNote: 'Lo recordaré mientras hablamos y luego lo olvidaré. Inicia sesión para conservarlo.',
     whatIRemember: 'Lo que recuerdo',
     nothingRemembered: 'Nada todavía. Dímelo sin más — «soy vegetariano», «uso silla de ruedas» — y lo guardaré.',
     forget: 'Olvidar',
@@ -167,6 +170,9 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     notSyncing: 'Ahora mismo no llego a tu cuenta; no se está guardando nada nuevo.',
     signInFailed: 'No se pudo iniciar sesión. Inténtalo de nuevo.',
     loadingAccount: 'Cargando…',
+    nudgeTitle: 'Guarda tus preferencias',
+    nudgeBody: "Conecta tu cuenta de Google y recordaré tus preferencias en cada visita al aeropuerto. Tu dieta, las salas VIP que prefieres, hasta los ingredientes de tu pizza favorita. ¡Lo que se te ocurra!",
+    notNow: 'Ahora no',
   },
   zh: {
     appTitle: '奥克兰国际机场',
@@ -209,9 +215,8 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     continueWithGoogle: '使用 Google 继续',
     signOut: '退出登录',
     guest: '访客',
-    accountWhy: '登录后，我会记住您的偏好——饮食、出行方式、常坐的航空公司，下次直接用。不登录也能使用全部功能。',
+    accountWhy: "关联您的 Google 账户，我就会记住您每次来机场的偏好。饮食、常去的休息室，甚至您最爱的披萨配料，都可以告诉我！",
     accountSavedNote: '已保存到您的账户。下次再来时我依然记得。',
-    sessionOnlyNote: '这次对话中我会记住，结束后就会忘记。登录即可保留。',
     whatIRemember: '我记得的事',
     nothingRemembered: '还没有。直接告诉我——“我吃素”、“我使用轮椅”——我会记住。',
     forget: '忘记',
@@ -220,6 +225,9 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     notSyncing: '现在连不上您的账户，新内容暂未保存。',
     signInFailed: '登录未成功，请重试。',
     loadingAccount: '加载中…',
+    nudgeTitle: '保存您的偏好',
+    nudgeBody: "关联您的 Google 账户，我就会记住您每次来机场的偏好。饮食、常去的休息室，甚至您最爱的披萨配料，都可以告诉我！",
+    notNow: '暂不',
   },
   fr: {
     appTitle: 'Aéroport international d’Oakland',
@@ -262,9 +270,8 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     continueWithGoogle: 'Continuer avec Google',
     signOut: 'Se déconnecter',
     guest: 'Invité',
-    accountWhy: 'Connectez-vous et je retiendrai vos préférences pour la prochaine fois : votre régime, vos déplacements, votre compagnie aérienne. Tout fonctionne aussi sans compte.',
+    accountWhy: "Connectez votre compte Google et je retiendrai vos préférences à chaque passage à l'aéroport. Votre régime, vos salons préférés, jusqu'à la garniture de votre pizza. Tout ce que vous voulez !",
     accountSavedNote: 'Enregistré dans votre compte. Je le saurai encore à votre prochaine visite.',
-    sessionOnlyNote: 'Je m\'en souviendrai pendant notre conversation, puis je l\'oublierai. Connectez-vous pour le conserver.',
     whatIRemember: 'Ce que je retiens',
     nothingRemembered: 'Rien pour l\'instant. Dites-le-moi — « je suis végétarien », « je me déplace en fauteuil » — et je le garderai.',
     forget: 'Oublier',
@@ -273,6 +280,9 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     notSyncing: 'Je n\'atteins pas votre compte pour le moment — rien de nouveau n\'est enregistré.',
     signInFailed: 'La connexion a échoué. Veuillez réessayer.',
     loadingAccount: 'Chargement…',
+    nudgeTitle: 'Enregistrez vos préférences',
+    nudgeBody: "Connectez votre compte Google et je retiendrai vos préférences à chaque passage à l'aéroport. Votre régime, vos salons préférés, jusqu'à la garniture de votre pizza. Tout ce que vous voulez !",
+    notNow: 'Pas maintenant',
   },
   de: {
     appTitle: 'Oakland International Airport',
@@ -315,9 +325,8 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     continueWithGoogle: 'Mit Google fortfahren',
     signOut: 'Abmelden',
     guest: 'Gast',
-    accountWhy: 'Melden Sie sich an, dann merke ich mir Ihre Vorlieben fürs nächste Mal — Ernährung, wie Sie unterwegs sind, Ihre Fluggesellschaft. Alles hier funktioniert auch ohne Konto.',
+    accountWhy: "Verbinden Sie Ihr Google-Konto, dann merke ich mir Ihre Vorlieben für jeden Besuch am Flughafen. Ihre Ernährung, Ihre Lounges, sogar Ihren Lieblingspizzabelag. Sagen Sie einfach Bescheid!",
     accountSavedNote: 'In Ihrem Konto gespeichert. Beim nächsten Besuch weiß ich es noch.',
-    sessionOnlyNote: 'Während unseres Gesprächs merke ich es mir, danach nicht mehr. Melden Sie sich an, um es zu behalten.',
     whatIRemember: 'Was ich mir gemerkt habe',
     nothingRemembered: 'Noch nichts. Sagen Sie es einfach — „Ich bin Vegetarier“, „Ich nutze einen Rollstuhl“ — und ich behalte es.',
     forget: 'Vergessen',
@@ -326,6 +335,9 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     notSyncing: 'Ich erreiche Ihr Konto gerade nicht — es wird nichts Neues gespeichert.',
     signInFailed: 'Die Anmeldung hat nicht geklappt. Bitte erneut versuchen.',
     loadingAccount: 'Wird geladen…',
+    nudgeTitle: 'Vorlieben speichern',
+    nudgeBody: "Verbinden Sie Ihr Google-Konto, dann merke ich mir Ihre Vorlieben für jeden Besuch am Flughafen. Ihre Ernährung, Ihre Lounges, sogar Ihren Lieblingspizzabelag. Sagen Sie einfach Bescheid!",
+    notNow: 'Später',
   },
   ja: {
     appTitle: 'オークランド国際空港',
@@ -368,9 +380,8 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     continueWithGoogle: 'Google で続ける',
     signOut: 'ログアウト',
     guest: 'ゲスト',
-    accountWhy: 'ログインすると、お食事のご希望や移動のしかた、よく使う航空会社を次回のために覚えておきます。アカウントなしでもすべてご利用いただけます。',
+    accountWhy: "Google アカウントを連携すると、空港に来られるたびにお好みを覚えておきます。食事のこと、よく使うラウンジ、好きなピザの具まで、何でもどうぞ！",
     accountSavedNote: 'アカウントに保存しました。次回も覚えています。',
-    sessionOnlyNote: '今回の会話中は覚えていますが、終わると忘れます。保存するにはログインしてください。',
     whatIRemember: '覚えていること',
     nothingRemembered: 'まだありません。「ベジタリアンです」「車いすを使っています」など、お話しいただければ覚えます。',
     forget: '削除',
@@ -379,6 +390,9 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     notSyncing: '今はアカウントに接続できず、新しい内容は保存されていません。',
     signInFailed: 'ログインできませんでした。もう一度お試しください。',
     loadingAccount: '読み込み中…',
+    nudgeTitle: '設定を保存します',
+    nudgeBody: "Google アカウントを連携すると、空港に来られるたびにお好みを覚えておきます。食事のこと、よく使うラウンジ、好きなピザの具まで、何でもどうぞ！",
+    notNow: '今はしない',
   },
   ko: {
     appTitle: '오클랜드 국제공항',
@@ -421,9 +435,8 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     continueWithGoogle: 'Google로 계속하기',
     signOut: '로그아웃',
     guest: '게스트',
-    accountWhy: '로그인하시면 식단, 이동 방식, 자주 이용하는 항공사 같은 선호를 다음에도 기억해두겠습니다. 계정 없이도 모든 기능을 쓸 수 있어요.',
+    accountWhy: "Google 계정을 연결하면 공항에 오실 때마다 취향을 기억해 둘게요. 식단, 자주 가는 라운지, 좋아하는 피자 토핑까지 뭐든 말씀해 주세요!",
     accountSavedNote: '계정에 저장했어요. 다음에 오셔도 그대로 기억합니다.',
-    sessionOnlyNote: '이번 대화 동안은 기억하지만 끝나면 잊어요. 남기려면 로그인하세요.',
     whatIRemember: '기억하고 있는 것',
     nothingRemembered: '아직 없어요. “저는 채식이에요”, “휠체어를 사용해요”처럼 말씀해 주시면 기억할게요.',
     forget: '삭제',
@@ -432,6 +445,9 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     notSyncing: '지금은 계정에 연결되지 않아 새로운 내용이 저장되지 않아요.',
     signInFailed: '로그인에 실패했어요. 다시 시도해 주세요.',
     loadingAccount: '불러오는 중…',
+    nudgeTitle: '설정을 저장하세요',
+    nudgeBody: "Google 계정을 연결하면 공항에 오실 때마다 취향을 기억해 둘게요. 식단, 자주 가는 라운지, 좋아하는 피자 토핑까지 뭐든 말씀해 주세요!",
+    notNow: '나중에',
   },
   pt: {
     appTitle: 'Aeroporto Internacional de Oakland',
@@ -474,9 +490,8 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     continueWithGoogle: 'Continuar com o Google',
     signOut: 'Terminar sessão',
     guest: 'Convidado',
-    accountWhy: 'Inicie sessão e guardo as suas preferências para a próxima vez — a alimentação, como se desloca, a companhia com que voa. Tudo aqui funciona sem conta.',
+    accountWhy: "Ligue a sua conta Google e vou lembrar-me das suas preferências em cada visita ao aeroporto. A sua dieta, os lounges que prefere, até os ingredientes da sua pizza favorita. É só dizer!",
     accountSavedNote: 'Guardado na sua conta. Da próxima vez ainda me vou lembrar.',
-    sessionOnlyNote: 'Vou lembrar-me enquanto falamos e depois esqueço. Inicie sessão para guardar.',
     whatIRemember: 'O que eu sei de si',
     nothingRemembered: 'Ainda nada. Basta dizer-me — «sou vegetariano», «uso cadeira de rodas» — e eu guardo.',
     forget: 'Esquecer',
@@ -485,6 +500,9 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     notSyncing: 'Não consigo chegar à sua conta neste momento — nada de novo está a ser guardado.',
     signInFailed: 'O início de sessão falhou. Tente novamente.',
     loadingAccount: 'A carregar…',
+    nudgeTitle: 'Guarde as suas preferências',
+    nudgeBody: "Ligue a sua conta Google e vou lembrar-me das suas preferências em cada visita ao aeroporto. A sua dieta, os lounges que prefere, até os ingredientes da sua pizza favorita. É só dizer!",
+    notNow: 'Agora não',
   },
   ar: {
     appTitle: 'مطار أوكلاند الدولي',
@@ -527,9 +545,8 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     continueWithGoogle: 'المتابعة باستخدام Google',
     signOut: 'تسجيل الخروج',
     guest: 'ضيف',
-    accountWhy: 'سجّل الدخول وسأتذكر تفضيلاتك للمرة القادمة — نظامك الغذائي، وطريقة تنقلك، وشركة الطيران التي تفضلها. وكل شيء هنا يعمل بدون حساب.',
+    accountWhy: "اربط حساب Google وسأتذكّر تفضيلاتك في كل زيارة للمطار. نظامك الغذائي، الصالات التي تفضّلها، وحتى إضافات البيتزا المفضّلة لديك. أخبرني بما تشاء!",
     accountSavedNote: 'تم الحفظ في حسابك. سأظل أعرف ذلك في زيارتك القادمة.',
-    sessionOnlyNote: 'سأتذكر هذا ما دمنا نتحدث، ثم أنساه. سجّل الدخول للاحتفاظ به.',
     whatIRemember: 'ما أتذكره عنك',
     nothingRemembered: 'لا شيء بعد. أخبرني فحسب — «أنا نباتي»، «أستخدم كرسيًا متحركًا» — وسأحتفظ به.',
     forget: 'حذف',
@@ -538,6 +555,9 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     notSyncing: 'لا أصل إلى حسابك الآن — لا يُحفظ أي شيء جديد.',
     signInFailed: 'لم يتم تسجيل الدخول. يرجى المحاولة مرة أخرى.',
     loadingAccount: 'جارٍ التحميل…',
+    nudgeTitle: 'احفظ تفضيلاتك',
+    nudgeBody: "اربط حساب Google وسأتذكّر تفضيلاتك في كل زيارة للمطار. نظامك الغذائي، الصالات التي تفضّلها، وحتى إضافات البيتزا المفضّلة لديك. أخبرني بما تشاء!",
+    notNow: 'ليس الآن',
   },
   hi: {
     appTitle: 'ओकलैंड इंटरनेशनल एयरपोर्ट',
@@ -580,9 +600,8 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     continueWithGoogle: 'Google से जारी रखें',
     signOut: 'साइन आउट',
     guest: 'मेहमान',
-    accountWhy: 'साइन इन करें और मैं आपकी पसंद अगली बार के लिए याद रखूँगा — खानपान, आने-जाने का तरीका, पसंदीदा एयरलाइन। बिना खाते के भी सब कुछ काम करता है।',
+    accountWhy: "अपना Google खाता जोड़ें और मैं हर बार एयरपोर्ट आने पर आपकी पसंद याद रखूँगा। आपका खानपान, पसंदीदा लाउंज, यहाँ तक कि पिज़्ज़ा की टॉपिंग भी। जो चाहें बताइए!",
     accountSavedNote: 'आपके खाते में सहेज लिया। अगली बार भी मुझे यह याद रहेगा।',
-    sessionOnlyNote: 'जब तक हम बात कर रहे हैं मुझे याद रहेगा, फिर भूल जाऊँगा। रखने के लिए साइन इन करें।',
     whatIRemember: 'मुझे जो याद है',
     nothingRemembered: 'अभी कुछ नहीं। बस बताइए — “मैं शाकाहारी हूँ”, “मैं व्हीलचेयर इस्तेमाल करता हूँ” — मैं याद रख लूँगा।',
     forget: 'हटाएँ',
@@ -591,6 +610,9 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     notSyncing: 'अभी आपके खाते तक नहीं पहुँच पा रहा — नया कुछ सहेजा नहीं जा रहा।',
     signInFailed: 'साइन इन नहीं हो पाया। कृपया फिर कोशिश करें।',
     loadingAccount: 'लोड हो रहा है…',
+    nudgeTitle: 'अपनी पसंद सहेजें',
+    nudgeBody: "अपना Google खाता जोड़ें और मैं हर बार एयरपोर्ट आने पर आपकी पसंद याद रखूँगा। आपका खानपान, पसंदीदा लाउंज, यहाँ तक कि पिज़्ज़ा की टॉपिंग भी। जो चाहें बताइए!",
+    notNow: 'अभी नहीं',
   },
   it: {
     appTitle: 'Aeroporto Internazionale di Oakland',
@@ -633,9 +655,8 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     continueWithGoogle: 'Continua con Google',
     signOut: 'Esci',
     guest: 'Ospite',
-    accountWhy: 'Accedi e ricorderò le tue preferenze per la prossima volta: la dieta, come ti sposti, la compagnia con cui voli. Qui funziona tutto anche senza account.',
+    accountWhy: "Collega il tuo account Google e ricorderò le tue preferenze a ogni visita in aeroporto. La tua dieta, le lounge che preferisci, perfino il condimento della tua pizza. Quello che vuoi!",
     accountSavedNote: 'Salvato nel tuo account. La prossima volta lo saprò ancora.',
-    sessionOnlyNote: 'Lo ricordo mentre parliamo, poi lo lascio andare. Accedi per conservarlo.',
     whatIRemember: 'Cosa ricordo',
     nothingRemembered: 'Ancora niente. Dimmelo e basta — «sono vegetariano», «uso la sedia a rotelle» — e me lo terrò.',
     forget: 'Dimentica',
@@ -644,6 +665,9 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     notSyncing: 'Non riesco a raggiungere il tuo account in questo momento: non sto salvando nulla di nuovo.',
     signInFailed: 'Accesso non riuscito. Riprova.',
     loadingAccount: 'Caricamento…',
+    nudgeTitle: 'Salva le tue preferenze',
+    nudgeBody: "Collega il tuo account Google e ricorderò le tue preferenze a ogni visita in aeroporto. La tua dieta, le lounge che preferisci, perfino il condimento della tua pizza. Quello che vuoi!",
+    notNow: 'Non ora',
   },
   ru: {
     appTitle: 'Международный аэропорт Окленда',
@@ -686,9 +710,8 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     continueWithGoogle: 'Продолжить с Google',
     signOut: 'Выйти',
     guest: 'Гость',
-    accountWhy: 'Войдите — и я запомню ваши предпочтения к следующему разу: питание, как вам удобно передвигаться, авиакомпанию. Всё здесь работает и без аккаунта.',
+    accountWhy: "Подключите аккаунт Google, и я буду помнить ваши предпочтения при каждом приезде в аэропорт. Питание, любимые лаунжи, даже начинку для пиццы. Что угодно!",
     accountSavedNote: 'Сохранено в вашем аккаунте. В следующий раз я это вспомню.',
-    sessionOnlyNote: 'Запомню на время разговора, потом забуду. Войдите, чтобы сохранить.',
     whatIRemember: 'Что я помню',
     nothingRemembered: 'Пока ничего. Просто скажите — «я вегетарианец», «я передвигаюсь на коляске» — и я запомню.',
     forget: 'Удалить',
@@ -697,6 +720,9 @@ export const UI_STRINGS: Record<string, UIStrings> = {
     notSyncing: 'Сейчас нет связи с вашим аккаунтом — новое не сохраняется.',
     signInFailed: 'Войти не получилось. Попробуйте ещё раз.',
     loadingAccount: 'Загрузка…',
+    nudgeTitle: 'Сохраните свои предпочтения',
+    nudgeBody: "Подключите аккаунт Google, и я буду помнить ваши предпочтения при каждом приезде в аэропорт. Питание, любимые лаунжи, даже начинку для пиццы. Что угодно!",
+    notNow: 'Не сейчас',
   },
 }
 
