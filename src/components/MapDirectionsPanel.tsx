@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import type { MapActionPayload } from '../lib/types'
 import { GOOGLE_MAPS_API_KEY } from '../lib/constants'
+import { strings } from '../lib/i18n'
 import { loadGoogleMaps } from '../lib/googleMapsLoader'
 
 interface Props {
   action: MapActionPayload
   userLat?: number
   userLng?: number
+  uiLang: string
   onDismiss: () => void
 }
 
@@ -25,7 +27,7 @@ const USER_DOT_COLOR = '#1A73E8' // "you are here" — Google's own blue-dot blu
 // back to showing bare pins with no connecting line. Drawing the line
 // ourselves (straight between our own known waypoints) guarantees the route
 // is always visible, in blue, regardless of what Google's router thinks.
-function MapCanvas({ action, userLat, userLng }: { action: MapActionPayload; userLat?: number; userLng?: number }) {
+function MapCanvas({ action, userLat, userLng, uiLang }: { action: MapActionPayload; userLat?: number; userLng?: number; uiLang: string }) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<any>(null)
   const overlaysRef = useRef<any[]>([])
@@ -196,22 +198,24 @@ function MapCanvas({ action, userLat, userLng }: { action: MapActionPayload; use
   }, [action, userLat, userLng])
 
   if (!GOOGLE_MAPS_API_KEY) {
-    return <div className="map-sheet-empty">Google Maps API key not configured.</div>
+    return <div className="map-sheet-empty">{strings(uiLang).mapsKeyMissing}</div>
   }
 
   return <div ref={containerRef} className="map-canvas" />
 }
 
 function MapHeader({
-  destinationName, isDirections, expanded,
+  destinationName, isDirections, expanded, uiLang,
   onExpand, onDismiss,
 }: {
   destinationName: string
   isDirections: boolean
   expanded: boolean
+  uiLang: string
   onExpand: () => void
   onDismiss: () => void
 }) {
+  const S = strings(uiLang)
   return (
     <div className="map-directions-header">
       <div className="map-directions-label">
@@ -225,10 +229,10 @@ function MapHeader({
             <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 14 8 14s8-8.75 8-14a8 8 0 0 0-8-8z" />
           </svg>
         )}
-        <span>{isDirections ? 'Directions to ' : ''}<strong>{destinationName}</strong></span>
+        <span>{isDirections ? `${S.directionsTo} ` : ''}<strong>{destinationName}</strong></span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-        <button className="map-directions-dismiss" onClick={onExpand} aria-label={expanded ? 'Collapse map' : 'Expand map'}>
+        <button className="map-directions-dismiss" onClick={onExpand} aria-label={expanded ? S.collapseMap : S.expandMap}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             {expanded ? (
               <>
@@ -243,7 +247,7 @@ function MapHeader({
             )}
           </svg>
         </button>
-        <button className="map-directions-dismiss" onClick={onDismiss} aria-label="Dismiss map">
+        <button className="map-directions-dismiss" onClick={onDismiss} aria-label={S.dismissMap}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
             <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
           </svg>
@@ -253,8 +257,9 @@ function MapHeader({
   )
 }
 
-export function MapDirectionsPanel({ action, userLat, userLng, onDismiss }: Props) {
+export function MapDirectionsPanel({ action, userLat, userLng, uiLang, onDismiss }: Props) {
   const [expanded, setExpanded] = useState(false)
+  const S = strings(uiLang)
 
   if (action.type === 'clear') return null
 
@@ -263,7 +268,7 @@ export function MapDirectionsPanel({ action, userLat, userLng, onDismiss }: Prop
     : action.destination.name
   const isDirections = action.type === 'show_directions' || action.type === 'show_route' || action.type === 'show_trajectory'
   const floorLabel = action.type === 'show_trajectory' && action.segments.length > 1
-    ? `${action.segments[action.activeSegmentIndex]?.levelName ?? ''} · Floor ${action.activeSegmentIndex + 1} of ${action.segments.length}`
+    ? `${action.segments[action.activeSegmentIndex]?.levelName ?? ''} · ${S.floor} ${action.activeSegmentIndex + 1}/${action.segments.length}`
     : null
 
   return (
@@ -273,13 +278,14 @@ export function MapDirectionsPanel({ action, userLat, userLng, onDismiss }: Prop
         <MapHeader
           destinationName={destinationName}
           isDirections={isDirections}
+          uiLang={uiLang}
           expanded={false}
           onExpand={() => setExpanded(true)}
           onDismiss={onDismiss}
         />
         <div className="map-directions-embed">
           {floorLabel && <div className="map-floor-indicator">{floorLabel}</div>}
-          <MapCanvas action={action} userLat={userLat} userLng={userLng} />
+          <MapCanvas action={action} userLat={userLat} userLng={userLng} uiLang={uiLang} />
         </div>
       </div>
 
@@ -290,13 +296,14 @@ export function MapDirectionsPanel({ action, userLat, userLng, onDismiss }: Prop
             <MapHeader
               destinationName={destinationName}
               isDirections={isDirections}
+              uiLang={uiLang}
               expanded={true}
               onExpand={() => setExpanded(false)}
               onDismiss={() => { setExpanded(false); onDismiss() }}
             />
             <div className="map-expand-embed">
               {floorLabel && <div className="map-floor-indicator">{floorLabel}</div>}
-              <MapCanvas action={action} userLat={userLat} userLng={userLng} />
+              <MapCanvas action={action} userLat={userLat} userLng={userLng} uiLang={uiLang} />
             </div>
           </div>
         </div>

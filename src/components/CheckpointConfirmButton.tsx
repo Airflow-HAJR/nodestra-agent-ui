@@ -1,8 +1,10 @@
 import type { CheckpointPrompt } from '../lib/types'
+import { strings } from '../lib/i18n'
 
 interface Props {
   prompt: CheckpointPrompt
   visible: boolean
+  uiLang: string
   onConfirm: () => void
   onNeedHelp: () => void
 }
@@ -18,18 +20,19 @@ interface Props {
 // the row mounts as soon as the checkpoint arrives (so its layout space is
 // reserved) but stays invisible until the caller flips `visible` once the
 // agent has actually finished speaking about it.
-export function CheckpointConfirmButton({ prompt, visible, onConfirm, onNeedHelp }: Props) {
+export function CheckpointConfirmButton({ prompt, visible, uiLang, onConfirm, onNeedHelp }: Props) {
+  const S = strings(uiLang)
   return (
     <div className={`checkpoint-pill-row${visible ? ' checkpoint-pill-row--visible' : ''}`}>
       <button
         className="checkpoint-pill checkpoint-pill--confirm"
         onClick={onConfirm}
-        title={`Made it to ${prompt.poiName}`}
+        title={`${S.madeItTo} ${prompt.poiName}`}
       >
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <polyline points="20 6 9 17 4 12" />
         </svg>
-        <span className="checkpoint-pill__prefix">Made it to</span>
+        <span className="checkpoint-pill__prefix">{S.madeItTo}</span>
         <span className="checkpoint-pill__poi">{prompt.poiName}</span>
       </button>
       <button className="checkpoint-pill checkpoint-pill--help" onClick={onNeedHelp}>
@@ -38,7 +41,7 @@ export function CheckpointConfirmButton({ prompt, visible, onConfirm, onNeedHelp
           <path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2 2-2.5 3" />
           <circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none" />
         </svg>
-        Need help
+        {S.needHelp}
       </button>
     </div>
   )

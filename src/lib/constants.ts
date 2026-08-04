@@ -1,6 +1,11 @@
 import type { Language } from './types'
 
+export const AUTO_LANGUAGE = 'auto'
+
 export const LANGUAGES: Language[] = [
+  // Deepgram transcribes in multilingual mode under this one and reports what
+  // it heard, so the UI can follow the speaker instead of asking first.
+  { code: AUTO_LANGUAGE, name: 'Auto-detect', nativeName: 'Auto' },
   { code: 'en', name: 'English', nativeName: 'English' },
   { code: 'es', name: 'Spanish', nativeName: 'Español' },
   { code: 'zh', name: 'Mandarin', nativeName: '中文' },

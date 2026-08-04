@@ -6,7 +6,8 @@ import { CheckpointConfirmButton } from './components/CheckpointConfirmButton'
 import { useVoiceAgent } from './hooks/useVoiceAgent'
 import { useGeolocation } from './hooks/useGeolocation'
 import { useTypewriter } from './hooks/useTypewriter'
-import { LANGUAGES, DEFAULT_LANGUAGE, LANGUAGE_STORAGE_KEY, USER_ID_STORAGE_KEY, WS_URL, generateUserId, GOOGLE_MAPS_API_KEY, AGENT_AVATAR_URL } from './lib/constants'
+import { LANGUAGES, AUTO_LANGUAGE, DEFAULT_LANGUAGE, LANGUAGE_STORAGE_KEY, USER_ID_STORAGE_KEY, WS_URL, generateUserId, GOOGLE_MAPS_API_KEY, AGENT_AVATAR_URL } from './lib/constants'
+import { uiLanguage, strings, RTL_LANGUAGES } from './lib/i18n'
 import { haversineMeters } from './lib/geo'
 import type { Language } from './lib/types'
 
@@ -43,6 +44,12 @@ export function App() {
 
   const geo   = useGeolocation()
   const agent = useVoiceAgent({ serverUrl: WS_URL, language, userId })
+
+  // Under auto the chrome follows whatever the server last heard, so the whole
+  // page moves to the traveler's language without them touching the pill.
+  const uiLang = uiLanguage(language, agent.detectedLanguage)
+  const S = strings(uiLang)
+  const isRtl = RTL_LANGUAGES.has(uiLang)
 
   // Auto-request location on mount — triggers the browser's native permission popup
   useEffect(() => { geo.requestLocation() }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -164,18 +171,24 @@ export function App() {
     if (historyOpen) setHistoryOpen(false)
   }
 
-  // Falls back to the raw code so an unrecognised stored language still shows
-  // something rather than an empty pill.
-  const activeLanguageName =
-    LANGUAGES.find(l => l.code === language)?.nativeName ?? language
+  // Under auto the pill names what's actually being spoken once we know it,
+  // rather than leaving the user staring at "Auto" with no idea what it chose.
+  const activeLanguageName = language === AUTO_LANGUAGE
+    ? (agent.detectedLanguage
+        ? `${S.autoDetect} · ${LANGUAGES.find(l => l.code === agent.detectedLanguage)?.nativeName ?? agent.detectedLanguage}`
+        : S.autoDetect)
+    : LANGUAGES.find(l => l.code === language)?.nativeName ?? language
 
   const handleLanguageSelect = useCallback((lang: Language) => {
     setLanguage(lang.code)
     try { localStorage.setItem(LANGUAGE_STORAGE_KEY, lang.code) } catch { /* ignore */ }
+    // Stops any reply mid-sentence, restarts it in the new language, and
+    // retranslates the transcript already on screen.
+    agent.changeLanguage(lang.code)
     // The header pill is the confirmation now, so there's nothing left to do
     // in the sheet once a language is picked.
     setOverflowOpen(false)
-  }, [])
+  }, [agent])
 
   const handleSmsSubmit = useCallback(async () => {
     if (!smsPhone.trim()) return
@@ -242,11 +255,14 @@ export function App() {
     : 'disconnected'
   }`
 
-  const statusCaption = agent.muted ? 'Muted'
-    : isListening ? 'Listening…'
-    : isThinking ? (agent.thinkingLabel ?? 'Thinking…')
-    : agent.connectionState === 'reconnecting' ? 'Reconnecting…'
-    : agent.connectionState === 'disconnected' ? 'Disconnected'
+  const statusCaption = agent.pendingLanguage ? S.translating
+    : agent.muted ? S.muted
+    : isListening ? S.listening
+    // thinkingLabel is the server's per-tool label ("Charting course…") and is
+    // still English-only — fall back to the localized generic when absent.
+    : isThinking ? (agent.thinkingLabel ?? S.thinking)
+    : agent.connectionState === 'reconnecting' ? S.reconnecting
+    : agent.connectionState === 'disconnected' ? S.disconnected
     : ''
 
   const msgs      = agent.messages
@@ -305,12 +321,14 @@ export function App() {
   return (
     <div
       className={`app${agent.checkpointPrompt ? ' app--checkpoint' : ''}`}
+      lang={uiLang}
+      dir={isRtl ? 'rtl' : 'ltr'}
       onClick={ensureAudioUnlocked}
     >
 
       {/* ── Header ── */}
       <header className="app-header">
-        <span className="header-title">Oakland International Airport</span>
+        <span className="header-title">{S.appTitle}</span>
         <div className="header-right">
           <span className={dotClass} />
           {/* Names the language that's actually active, and is the way to
@@ -318,7 +336,7 @@ export function App() {
           <button
             className="header-lang-pill"
             onClick={(e) => { e.stopPropagation(); setOverflowOpen(true) }}
-            aria-label={`Language: ${activeLanguageName}. Change language`}
+            aria-label={`${S.language}: ${activeLanguageName}. ${S.changeLanguage}`}
           >
             {activeLanguageName}
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -345,12 +363,12 @@ export function App() {
           {historyOpen ? (
             <div className="history-overlay" onClick={(e) => e.stopPropagation()}>
               <div className="history-overlay-header">
-                <span className="history-overlay-title">Conversation</span>
+                <span className="history-overlay-title">{S.conversation}</span>
                 <button className="history-overlay-close" onClick={() => setHistoryOpen(false)}>
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <polyline points="6 9 12 15 18 9" />
                   </svg>
-                  Back
+                  {S.back}
                 </button>
               </div>
               <div className="history-scroll" ref={historyScrollRef}>
@@ -412,6 +430,7 @@ export function App() {
       {agent.checkpointPrompt && (
         <CheckpointConfirmButton
           prompt={agent.checkpointPrompt}
+          uiLang={uiLang}
           visible={checkpointVisible}
           onConfirm={agent.confirmCheckpoint}
           onNeedHelp={agent.requestCheckpointHelp}
@@ -431,15 +450,15 @@ export function App() {
               autoFocus
               value={textValue}
               onChange={(e) => setTextValue(e.target.value)}
-              placeholder="Type a message…"
+              placeholder={S.typeMessage}
               onKeyDown={(e) => { if (e.key === 'Escape') closeTextInput() }}
             />
-            <button type="button" className="text-input-close" onClick={closeTextInput} aria-label="Close text input">
+            <button type="button" className="text-input-close" onClick={closeTextInput} aria-label={S.closeInput}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                 <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
               </svg>
             </button>
-            <button type="submit" className="text-input-send" disabled={!textValue.trim()} aria-label="Send">
+            <button type="submit" className="text-input-send" disabled={!textValue.trim()} aria-label={S.send}>
               <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M2 21l21-9L2 3v7l15 2-15 2z" />
               </svg>
@@ -450,7 +469,7 @@ export function App() {
             <button
               className="bottom-icon-btn"
               onClick={(e) => { e.stopPropagation(); openTextInput() }}
-              aria-label="Type instead of speaking"
+              aria-label={S.typeInstead}
             >
               <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="2" y="5" width="20" height="14" rx="2" />
@@ -462,7 +481,7 @@ export function App() {
             <button
               className={`mute-btn${agent.muted ? ' mute-btn--muted' : ''}`}
               onClick={(e) => { e.stopPropagation(); handleMuteToggle() }}
-              aria-label={agent.muted ? 'Unmute microphone' : 'Mute microphone'}
+              aria-label={agent.muted ? S.unmuteMic : S.muteMic}
             >
               {agent.muted ? (
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -485,7 +504,7 @@ export function App() {
             <button
               className="bottom-icon-btn bottom-icon-btn--nav"
               onClick={(e) => { e.stopPropagation(); openMapSheet() }}
-              aria-label="Show map"
+              aria-label={S.showMap}
             >
               <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="10" r="3" />
@@ -510,6 +529,7 @@ export function App() {
             {agent.mapAction ? (
               <MapDirectionsPanel
                 action={agent.mapAction}
+                uiLang={uiLang}
                 userLat={geo.latitude ?? undefined}
                 userLng={geo.longitude ?? undefined}
                 onDismiss={closeMapSheet}
@@ -518,7 +538,7 @@ export function App() {
               <div className="maps-frame-wrap">
                 <iframe
                   src={mapsUrl}
-                  title="Your location"
+                  title={S.yourLocation}
                   loading="lazy"
                   referrerPolicy="no-referrer-when-downgrade"
                   style={{ pointerEvents: 'none' }}
@@ -529,7 +549,7 @@ export function App() {
                 </div>
               </div>
             ) : (
-              <div className="map-sheet-empty">Location unavailable</div>
+              <div className="map-sheet-empty">{S.locationUnavailable}</div>
             )}
           </div>
         </div>
@@ -540,7 +560,7 @@ export function App() {
         <div className="sheet-overlay" onClick={() => setOverflowOpen(false)}>
           <div className="sheet" onClick={(e) => e.stopPropagation()}>
             <div className="sheet-handle" />
-            <div className="sheet-title">Language</div>
+            <div className="sheet-title">{S.language}</div>
             <div className="lang-grid">
               {LANGUAGES.map(lang => (
                 <button
@@ -548,7 +568,7 @@ export function App() {
                   className={`lang-pill${language === lang.code ? ' lang-pill--active' : ''}`}
                   onClick={() => handleLanguageSelect(lang)}
                 >
-                  {lang.nativeName}
+                  {lang.code === AUTO_LANGUAGE ? S.autoDetect : lang.nativeName}
                 </button>
               ))}
             </div>
@@ -560,7 +580,7 @@ export function App() {
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                 </svg>
-                Text me instead
+                {S.textMeInstead}
               </button>
             </div>
           </div>
@@ -572,21 +592,21 @@ export function App() {
         <div className="sheet-overlay" onClick={() => setIsSmsOpen(false)}>
           <div className="sheet" onClick={e => e.stopPropagation()}>
             <div className="sheet-handle" />
-            <div className="sheet-title">Text the airport assistant</div>
+            <div className="sheet-title">{S.smsTitle}</div>
             {smsSent ? (
               <div className="sms-success">
                 <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                   <polyline points="22 4 12 14.01 9 11.01" />
                 </svg>
-                <p>Check your messages! You can continue this conversation via SMS.</p>
+                <p>{S.smsSuccess}</p>
                 {TWILIO_NUMBER && (
-                  <p className="sms-number">Or text us directly at <strong>{TWILIO_NUMBER}</strong></p>
+                  <p className="sms-number">{S.smsOr} <strong>{TWILIO_NUMBER}</strong></p>
                 )}
               </div>
             ) : (
               <>
-                <p className="sms-desc">Enter your phone number and we'll text you so you can chat with the airport assistant via SMS.</p>
+                <p className="sms-desc">{S.smsDesc}</p>
                 <input
                   className="sms-input"
                   type="tel"
@@ -597,14 +617,14 @@ export function App() {
                   autoFocus
                 />
                 {TWILIO_NUMBER && (
-                  <p className="sms-or">Or text us directly at <strong>{TWILIO_NUMBER}</strong></p>
+                  <p className="sms-or">{S.smsOr} <strong>{TWILIO_NUMBER}</strong></p>
                 )}
                 <button
                   className="sms-submit"
                   onClick={handleSmsSubmit}
                   disabled={!smsPhone.trim()}
                 >
-                  Send me the link
+                  {S.smsSubmit}
                 </button>
               </>
             )}

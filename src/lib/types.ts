@@ -102,6 +102,10 @@ export type ServerMessage =
   | { type: 'map_action'; action: MapActionPayload }
   | ({ type: 'checkpoint_prompt' } & CheckpointPrompt)
   | ({ type: 'checkpoint_resolved' } & CheckpointResolved)
+  // Auto mode only: what Deepgram actually heard, so the UI can follow along.
+  | { type: 'language_detected'; language: string }
+  // Reply to set_language — the same message ids, retranslated.
+  | { type: 'history_translated'; language: string; messages: { id: string; text: string }[] }
 
 // WebSocket message types — outbound to server
 export type ClientMessage =
@@ -110,6 +114,12 @@ export type ClientMessage =
   | { type: 'audio_chunk'; data: string }
   | { type: 'audio_end' }
   | { type: 'text'; text: string; language: string }
-  | { type: 'config'; language: string; userId?: string }
+  | { type: 'config'; language: string; userId?: string; greet?: boolean }
+  | {
+      type: 'set_language'
+      language: string
+      history: { id: string; role: 'user' | 'agent'; text: string }[]
+      speakId?: string  // the agent turn that was mid-playback, to restart in the new language
+    }
   | { type: 'ping' }
   | { type: 'location'; lat: number; lng: number; accuracy: number; timestamp: number }
