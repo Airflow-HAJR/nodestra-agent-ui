@@ -22,6 +22,10 @@ const DESTINATION_COLOR = '#EA4335'
 const WAYPOINT_COLOR = '#80868B'
 const PORTAL_COLOR = '#FBBC05' // elevator/escalator/stairs — the checkpoint the user is heading to on this floor
 const ACTIVE_COLOR = '#9C27B0' // the specific stop the user is currently being guided to — always wins over other colors
+// Candidate places the user is choosing between. Green because none of them is
+// the destination yet — they're all still live, and reusing the red
+// destination pin for three places at once would say otherwise.
+const OPTION_COLOR = '#34A853'
 const USER_DOT_COLOR = '#1A73E8' // "you are here" — Google's own blue-dot blue
 
 // Fit padding. Generous at the top and sides because the name chips extend
@@ -205,6 +209,25 @@ function MapCanvas({ action, userLat, userLng, uiLang }: { action: MapActionPayl
         return
       }
 
+      if (action.type === 'show_options') {
+        // Alternatives, not stops — so no polyline, and every pin is labelled
+        // rather than just the endpoints. The user's own position anchors the
+        // view when we have it, since "which of these is closest to me" is the
+        // question a set of options is being shown to answer.
+        action.options.forEach((opt) => {
+          addMarker(opt, OPTION_COLOR)
+          addLabel(opt, opt.note ? `${opt.name} · ${opt.note}` : opt.name, 'endpoint')
+        })
+        if (userLat != null && userLng != null) addUserDot({ lat: userLat, lng: userLng })
+        if (action.options.length === 1) {
+          map.setCenter(action.options[0])
+          map.setZoom(18)
+        } else {
+          map.fitBounds(bounds, LABEL_PADDING)
+        }
+        return
+      }
+
       if (action.type === 'show_directions') {
         const origin = action.origin ?? (userLat != null && userLng != null ? { lat: userLat, lng: userLng } : null)
         addMarker(action.destination, DESTINATION_COLOR)
@@ -344,7 +367,11 @@ export function MapDirectionsPanel({ action, userLat, userLng, uiLang, onDismiss
 
   const destinationName = action.type === 'show_route'
     ? action.stops[action.stops.length - 1]?.name ?? ''
-    : action.destination.name
+    : action.type === 'show_options'
+      // No single destination to name yet — the header says how many places are
+      // on the map instead of arbitrarily promoting one of them.
+      ? action.options.map(o => o.name).join(' · ')
+      : action.destination.name
   const isDirections = action.type === 'show_directions' || action.type === 'show_route' || action.type === 'show_trajectory'
   const floorLabel = action.type === 'show_trajectory' && action.segments.length > 1
     ? `${action.segments[action.activeSegmentIndex]?.levelName ?? ''} · ${S.floor} ${action.activeSegmentIndex + 1}/${action.segments.length}`

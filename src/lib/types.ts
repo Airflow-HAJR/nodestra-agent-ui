@@ -88,8 +88,16 @@ export interface TrajectoryPayload {
   etaMinutes: number | null
 }
 
+/** One of several places the agent is offering as a choice. Deliberately not a
+ *  route stop: these are alternatives, so nothing connects them on the map. */
+export interface MapOption extends MapDestination {
+  poiId: string
+  note?: string | null
+}
+
 export type MapActionPayload =
   | { type: 'show_destination'; destination: MapDestination }
+  | { type: 'show_options'; options: MapOption[] }
   | { type: 'show_directions'; destination: MapDestination; origin?: { lat: number; lng: number } }
   | { type: 'show_route'; stops: MapDestination[] }
   | TrajectoryPayload

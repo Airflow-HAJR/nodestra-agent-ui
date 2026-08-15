@@ -20,6 +20,11 @@ import type { Language, VoiceSettings as VoiceSettingsValue } from './lib/types'
 const TWILIO_NUMBER = import.meta.env.VITE_TWILIO_NUMBER ?? ''
 
 const MAP_AUTO_CLOSE_MS = 5000
+// A route collapses quickly because the agent is about to name the next
+// checkpoint anyway. A set of options is the opposite: the user is reading it
+// to make a choice, and it takes longer than five seconds to compare three
+// places against what the agent is saying about them.
+const MAP_OPTIONS_AUTO_CLOSE_MS = 15000
 const MAP_COLLAPSE_ANIM_MS = 500
 
 function getStoredLanguage(): string {
@@ -186,14 +191,17 @@ export function App() {
   const lastShownMapActionRef = useRef<typeof agent.mapAction>(null)
   useEffect(() => {
     const action = agent.mapAction
-    if (!action || (action.type !== 'show_directions' && action.type !== 'show_route' && action.type !== 'show_trajectory')) return
+    if (!action || (action.type !== 'show_directions' && action.type !== 'show_route' && action.type !== 'show_trajectory' && action.type !== 'show_options')) return
     if (agent.agentState !== 'speaking') return
     if (lastShownMapActionRef.current === action) return
     lastShownMapActionRef.current = action
     clearMapTimers()
     setMapSheetClosing(false)
     setMapSheetOpen(true)
-    mapAutoCloseTimerRef.current = setTimeout(collapseMapSheet, MAP_AUTO_CLOSE_MS)
+    mapAutoCloseTimerRef.current = setTimeout(
+      collapseMapSheet,
+      action.type === 'show_options' ? MAP_OPTIONS_AUTO_CLOSE_MS : MAP_AUTO_CLOSE_MS,
+    )
   }, [agent.mapAction, agent.agentState, clearMapTimers, collapseMapSheet])
 
   // Same idea as the map reveal above, but held back even longer: the
